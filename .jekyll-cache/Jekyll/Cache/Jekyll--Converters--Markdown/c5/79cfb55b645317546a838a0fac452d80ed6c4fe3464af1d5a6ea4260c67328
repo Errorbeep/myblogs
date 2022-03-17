@@ -1,0 +1,134 @@
+I"�<<hr />
+
+<p>使用Shell实现快速跳转到经常访问的路径，类似<code class="language-plaintext highlighter-rouge">zsh</code>的<code class="language-plaintext highlighter-rouge">d</code> 命令可以显示多条最近访问的路径并快速跳转到目标路径，与其不同的是，保存的不是访问路径的历史记录而是自己认为需要保存以待下次使用的路径，且终端关闭后保存的路径不会被清除，下次打开时还能查看保存的路径并直接跳转，于是，下次电脑重启或者新打开终端时就可以快速切换到自己想去的路径而不需要借助终端命令的历史记录、文件浏览器或者命令补全了。将此命令命名为<code class="language-plaintext highlighter-rouge">mjump</code>。</p>
+
+<p>当处于某一工作路径要从此路径退出或切换到其它路径，但是下次打开终端可能还要访问此路径时，可以直接输入<code class="language-plaintext highlighter-rouge">mjump -s</code>以将当前工作路径作持久化保存；下次打开终端想要查看以前保存了哪些路径时输入<code class="language-plaintext highlighter-rouge">mjump -o</code>即可；要切换到保存的某条路径时，输入<code class="language-plaintext highlighter-rouge">mjump -c n</code>，其中“n“表示目标路径的序号；在输入<code class="language-plaintext highlighter-rouge">mjump</code>而不带任何参数时会直接跳转到最后一次保存的路径；保存数量有限的路径，淘汰不经常访问的路径，且不重复保存。</p>
+
+<p>可以将路径保存到文件使其持久化；保存的路径应按LRU思想排序，即第一条路径应是最后一次保存的路径，逐渐淘汰最近使用次数少的路径，每次保存新路径时直接插入到文件第一行，再删除文本最后一行，路径记录在文本中的行号表示路径的访问权重，行号越小权重越高，当要插入的新路径已经存在于文件时应先删除原先的路径再插入新的路径到第一行。</p>
+
+<p>由于每次只向文件操作一条数据，可以用<code class="language-plaintext highlighter-rouge">sed</code>命令操作文件，对于macOS，<code class="language-plaintext highlighter-rouge">gnu-sed</code>相对系统默认的<code class="language-plaintext highlighter-rouge">sed</code>好用；<br />
+对于保存路径功能：</p>
+<ol>
+  <li>首先要获取当前路径；<br />
+==&gt; <code class="language-plaintext highlighter-rouge">pwd</code></li>
+  <li>判断文件中是否已经存在此路径；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">grep -q $p $file</code></li>
+  <li>若不存在此路径则直接插入在第一行且删除最后一行；   <br />
+==&gt; <code class="language-plaintext highlighter-rouge">gsed -i 1i/$p $file</code>      <br />
+==&gt; <code class="language-plaintext highlighter-rouge">gsed -i 'n, nd' $file</code></li>
+  <li>若存在此路径则先获得旧的路径的行号；  <br />
+==&gt;
+    <div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">line</span><span class="o">=</span><span class="sb">`</span><span class="nb">grep</span> <span class="nt">-n</span> <span class="s2">"</span><span class="nv">$p</span><span class="s2">$"</span> <span class="nv">$file</span>  | <span class="nb">awk</span> <span class="nt">-F</span> <span class="s1">':'</span> <span class="s1">'{print $1}'</span><span class="sb">`</span> 
+</code></pre></div>    </div>
+  </li>
+  <li>删除该行  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">gsed -i "$line, ${line}d" $file</code> <br />
+本来可以直接使用<code class="language-plaintext highlighter-rouge">sed</code>的搜索并删除功能，但是由于路径保存在$p，直接使用<code class="language-plaintext highlighter-rouge">gsed -i "/$p/d" $file</code>或类似命令会出现各种问题。</li>
+</ol>
+
+<p>切换路径：</p>
+<ol>
+  <li>获取输入的参数即保存的路径的行号；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">$#</code>表示参数个数，<code class="language-plaintext highlighter-rouge">$0</code>表示函数名，<code class="language-plaintext highlighter-rouge">$1</code>表示第一个参数，<code class="language-plaintext highlighter-rouge">$2</code>表示第二个参数</li>
+  <li>根据行号取文件中的路径；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">gsed -n 'n, np' $file</code></li>
+  <li>切换到目标路径；  <br />
+==&gt; cd <code class="language-plaintext highlighter-rouge">gsed -n '1, 1p' $file</code>； <br />
+==&gt; 直接在终端执行此脚本会创建子线程运行，所以终端的工作目录不会改变，所以运行时要适用<code class="language-plaintext highlighter-rouge">source mjump -c n</code>，使其在shell父进程运行。</li>
+</ol>
+
+<p>注意：</p>
+<ol>
+  <li><code class="language-plaintext highlighter-rouge">sed</code>/<code class="language-plaintext highlighter-rouge">gsed</code>是“stream editor”，无法修改空文件，因此创建的文件不能是空文件，即只使用<code class="language-plaintext highlighter-rouge">touch</code>创建此文件是不够的，可以直接用<code class="language-plaintext highlighter-rouge">echo $HOME &gt; $file</code>创建一个默认含有用户家目录的文件；</li>
+  <li>每个目录字符串都是前缀码，故可简化在文件中判断某路径是否存在的表达式为<code class="language-plaintext highlighter-rouge">grep -q "$p$" $file </code>，即忽略正则表达式中的<code class="language-plaintext highlighter-rouge">^/</code>，其在<code class="language-plaintext highlighter-rouge">grep</code>的匹配中和变量引用的<code class="language-plaintext highlighter-rouge">$</code>在一起会产生混淆以致无法得到正确的搜索结果；</li>
+  <li>存储的路径开头为两个<code class="language-plaintext highlighter-rouge">/</code>，这是导致各种匹配问题的根源；</li>
+  <li><code class="language-plaintext highlighter-rouge">==</code>或<code class="language-plaintext highlighter-rouge">=</code>均可用于字符串比较，两边都要有空格，变量赋值的<code class="language-plaintext highlighter-rouge">=</code>两边不能有空格；</li>
+  <li><code class="language-plaintext highlighter-rouge">[]</code>等同<code class="language-plaintext highlighter-rouge">test</code>，其中不能使用<code class="language-plaintext highlighter-rouge">||</code>，<code class="language-plaintext highlighter-rouge">&amp;&amp;</code>等，而<code class="language-plaintext highlighter-rouge">[[  ]]</code>可以</li>
+</ol>
+
+<p>Code:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#! /bin/zsh</span>
+
+
+<span class="nv">file</span><span class="o">=</span><span class="s2">"/Users/me/tools/rwp/path"</span>
+<span class="nv">backup</span><span class="o">=</span><span class="s2">"/Users/me/tools/rwp"</span>
+
+<span class="k">if</span> <span class="o">[</span> <span class="nt">-e</span> <span class="nv">$file</span> <span class="o">]</span>
+<span class="k">then
+else
+    </span><span class="nb">echo</span> <span class="nv">$HOME</span> <span class="o">&gt;</span> <span class="nv">$file</span>
+<span class="k">fi
+
+if</span> <span class="o">[[</span> <span class="nv">$1</span> <span class="o">=</span> <span class="s2">"-s"</span> <span class="o">||</span> <span class="nv">$1</span> <span class="o">=</span> <span class="s2">"--save"</span> <span class="o">]]</span>
+<span class="k">then
+    </span><span class="nv">p</span><span class="o">=</span><span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span>
+    <span class="nb">grep</span> <span class="nt">-q</span> <span class="s2">"</span><span class="nv">$p</span><span class="s2">$"</span> <span class="nv">$file</span> 
+    <span class="k">if</span> <span class="o">[</span> <span class="nv">$?</span> <span class="nt">-ne</span> 0 <span class="o">]</span>
+    <span class="k">then 
+        </span>gsed <span class="nt">-i</span> 1i/<span class="nv">$p</span> <span class="nv">$file</span> 
+        <span class="nv">file_lines</span><span class="o">=</span><span class="sb">`</span><span class="nb">wc</span> <span class="nt">-l</span> <span class="nv">$file</span> | <span class="nb">awk</span> <span class="nt">-F</span> <span class="s1">' '</span> <span class="s1">'{print $1}'</span><span class="sb">`</span>
+        <span class="k">if</span> <span class="o">[</span> <span class="nv">$file_lines</span> <span class="nt">-eq</span> 7 <span class="o">]</span>
+        <span class="k">then
+            </span>gsed <span class="nt">-i</span> <span class="s1">'7, 7d'</span> <span class="nv">$file</span>
+        <span class="k">fi
+    else</span>
+        <span class="c"># gsed -i "s#/$p##g" $file</span>
+        <span class="c"># gsed -i "/^$/d" $file</span>
+        <span class="nv">line</span><span class="o">=</span><span class="sb">`</span><span class="nb">grep</span> <span class="nt">-n</span> <span class="s2">"</span><span class="nv">$p</span><span class="s2">$"</span> <span class="nv">$file</span>  | <span class="nb">awk</span> <span class="nt">-F</span> <span class="s1">':'</span> <span class="s1">'{print $1}'</span><span class="sb">`</span>
+        gsed <span class="nt">-i</span> <span class="s2">"</span><span class="nv">$line</span><span class="s2">, </span><span class="k">${</span><span class="nv">line</span><span class="k">}</span><span class="s2">d"</span> <span class="nv">$file</span>
+        <span class="c"># gsed -i \\$p\\d $file</span>
+        gsed <span class="nt">-i</span> 1i/<span class="nv">$p</span> <span class="nv">$file</span> 
+    <span class="k">fi
+    </span><span class="nb">echo</span> <span class="s2">"current path saved to </span><span class="nv">$file</span><span class="s2">"</span>
+<span class="k">elif</span> <span class="o">[[</span> <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span> <span class="o">=</span> <span class="s1">'-o'</span> <span class="o">||</span> <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span> <span class="o">=</span> <span class="s1">'--out'</span> <span class="o">]]</span> 
+<span class="k">then 
+    </span><span class="nb">cat</span> <span class="nt">-n</span> <span class="nv">$file</span> 
+<span class="k">elif</span> <span class="o">[[</span> <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span> <span class="o">=</span> <span class="s1">'-c'</span> <span class="o">||</span>  <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span> <span class="o">=</span> <span class="s1">'--cd'</span> <span class="o">]]</span>
+<span class="k">then
+    if</span> <span class="o">[[</span> <span class="nv">$2</span> <span class="o">==</span> <span class="s2">""</span> <span class="o">||</span> <span class="nv">$2</span> <span class="o">==</span> <span class="s2">"1"</span> <span class="o">]]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'1, 1p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">elif</span> <span class="o">[</span> <span class="nv">$2</span> <span class="nt">-eq</span> 2 <span class="o">]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'2, 2p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">elif</span> <span class="o">[</span> <span class="nv">$2</span> <span class="nt">-eq</span> 3 <span class="o">]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'3, 3p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">elif</span> <span class="o">[</span> <span class="nv">$2</span> <span class="nt">-eq</span> 4 <span class="o">]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'4, 4p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">elif</span> <span class="o">[</span> <span class="nv">$2</span> <span class="nt">-eq</span> 5 <span class="o">]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'5, 5p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">elif</span> <span class="o">[</span> <span class="nv">$2</span> <span class="nt">-eq</span> 6 <span class="o">]</span>
+    <span class="k">then 
+        </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'6, 6p'</span> <span class="nv">$file</span><span class="sb">`</span>
+    <span class="k">else
+        </span><span class="nb">echo</span> <span class="s2">"out of index"</span>
+    <span class="k">fi
+elif</span> <span class="o">[[</span> <span class="nv">$1</span> <span class="o">==</span> <span class="s2">"-h"</span> <span class="o">||</span> <span class="nv">$1</span> <span class="o">==</span> <span class="s2">"--help"</span> <span class="o">]]</span>
+<span class="k">then
+    </span><span class="nb">echo</span> <span class="s2">"file location: "</span>
+    <span class="nb">ls</span> <span class="nt">-lT</span> <span class="nv">$file</span>
+    <span class="nb">echo</span> <span class="s2">"-- use '-s' to save path;</span><span class="se">\n</span><span class="s2">-- use '-o' to display saved path;</span><span class="se">\n</span><span class="s2">-- use '-c' to change directory.</span><span class="se">\n</span><span class="s2">"</span>
+<span class="k">elif</span> <span class="o">[</span> <span class="nv">$# </span><span class="nt">-eq</span> 0 <span class="o">]</span>
+<span class="k">then 
+    </span><span class="nb">cd</span> <span class="sb">`</span>gsed <span class="nt">-n</span> <span class="s1">'1, 1p'</span> <span class="nv">$file</span><span class="sb">`</span>
+<span class="k">else
+    </span><span class="nb">echo</span> <span class="s2">"mjump: wrong arguments.</span><span class="se">\n</span><span class="s2">-- use '-s' to save path;</span><span class="se">\n</span><span class="s2">--use '-o' to display saved path;</span><span class="se">\n</span><span class="s2">-- use '-c' to change directory.</span><span class="se">\n</span><span class="s2">"</span>
+<span class="k">fi</span>
+</code></pre></div></div>
+
+<p>运行:</p>
+<div align="left">
+    <img src="/images/shell01.png" width="50%" />
+</div>
+<p>使用了如下别名：</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">alias </span><span class="nv">jump</span><span class="o">=</span><span class="s2">"source /Users/me/tools/rwp/mjump"</span>
+<span class="nb">alias </span><span class="nv">jo</span><span class="o">=</span><span class="s2">"jump -o"</span>
+<span class="nb">alias </span><span class="nv">jc</span><span class="o">=</span><span class="s2">"jump -c"</span>
+<span class="nb">alias </span><span class="nv">js</span><span class="o">=</span><span class="s2">"jump -s"</span>
+</code></pre></div></div>
+
+:ET

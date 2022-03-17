@@ -1,0 +1,271 @@
+I"]�<hr />
+<p>续：<a href="/用户登录(c++,-mysql)">用户登录(c++, mysql)</a>。实现用户私聊功能，用户登录成功后选择私聊，输入目标用户名即可发起私聊。成功发起私聊后，用户要发送的信息会被先发到服务端，服务端根据目标用户名将信息发给对应的客户端；</p>
+
+<h3 id="思路">思路</h3>
+<ol>
+  <li>需要处理的客户端请求共两个：建立私聊和转发消息； <br />
+ a. 当客户端需要建立与某个用户的私聊时发送建立私聊请求，该请求中应包含的信息有：请求类型即私聊、目标用户名、发起私聊的用户名；服务端接收到该请求并解析后，根据目标用户名查找其套接字描述符并保存以待使用；  <br />
+ b. 客户端发送私聊消息的请求应包含的信息：请求类型即发送消息、消息内容；当服务端接收到发送私聊消息请求时，根据之前保存的目标用户的套接字描述符向其发送解析出的消息；</li>
+  <li>要找到某个用户名对应的套接字描述符，就要事先建立用户名和套接字描述符的映射；每次用户登录时都会与服务端建立连接，因此可以在登录时将用户名和描述符的映射保存起来；</li>
+  <li>客户端主要任务就是发送请求和显示回复，而服务端除了负责建立私聊和转发消息外还要做到：接收到用户的登录请求后不仅要核对登录信息返回核对结果，还要在登录成功后保存客户端的用户名和套接字描述符的映射，此映射可以使用unorderer_map存储，将用户名作为键值，描述符作为实值；</li>
+  <li>服务端建立和客户端的连接后会建立一个线程用于处理该客户端的所有请求，用于建立线程的函数是接收客户端发来的消息的函数RecvMsg()，该函数循环接收客户端消息，并在每次循环中调用处理客户度端消息的函数HanleRequests()，HandleRequests要根据客户端状态处理每个请求，因此要把客户端状态作为参数传入；目前服务端处理的请求不止一个，对每个请求的处理都可能会影响到用户的状态以致影响后续处理过程，所以在HandleRequests中应可以改变客户端的状态，故客户端的状态应使用引用传递给HandleRequests；</li>
+  <li>用户名和客户端套接字描述符的映射可以设置为类的静态变量以实现共享；服务端可能会创建多个线程，这些线程都会访问或修改前述映射，某个线程对登录请求的处理过程会对该映射做出修改，另一个线程对私聊请求的处理会访问该映射，这种情况下可能会出现线程竞争问题；对前述映射引入互斥锁，实现线程对此映射的互斥访问即可解决线程竞争问题；</li>
+</ol>
+
+<h3 id="客户端">客户端：</h3>
+<p>主要对启动客户端后调用的函数HandleClient做如下修改：</p>
+<ol>
+  <li>客户端的登录成功后的选项中添加建立私聊选项，选择发起私聊后，提示用户输入目标用户名，将这些信息整合成私聊请求发送至服务端；</li>
+  <li>提示用户输入要发送的消息并建立一个发送消息的线程将其发送至服务端，且在该线程内部要把消息封装成发送消息请求；</li>
+  <li>还要创建一个线程用于从服务端接收消息即来自私聊的目标用户的经服务端转发的消息；</li>
+  <li>确保发送消息线程先结束，接收消息线程后结束。</li>
+</ol>
+
+<h4 id="code">Code</h4>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="n">client</span><span class="o">::</span><span class="n">HandleClient</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">){</span>
+    <span class="kt">int</span> <span class="n">choice</span><span class="p">;</span>
+    <span class="n">string</span> <span class="n">name</span><span class="p">,</span><span class="n">pass</span><span class="p">,</span><span class="n">pass1</span><span class="p">;</span>
+    <span class="kt">bool</span> <span class="n">if_login</span><span class="o">=</span><span class="nb">false</span><span class="p">;</span><span class="c1">//记录是否登录成功</span>
+    <span class="n">string</span> <span class="n">login_name</span><span class="p">;</span><span class="c1">//记录成功登录的用户名</span>
+
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">" ------------------</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|                  |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"| 请输入你要的选项:|</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|    0:退出        |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|    1:登录        |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|    2:注册        |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|                  |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">" ------------------ </span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+
+    <span class="c1">//开始处理注册、登录事件</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">){</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">if_login</span><span class="p">)</span>
+           <span class="k">break</span><span class="p">;</span>
+        <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">choice</span><span class="p">;</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">choice</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="c1">//注册</span>
+        <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">choice</span><span class="o">==</span><span class="mi">2</span><span class="p">){</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"注册的用户名:"</span><span class="p">;</span>
+            <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">name</span><span class="p">;</span>
+            <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">){</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"密码:"</span><span class="p">;</span>
+                <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">pass</span><span class="p">;</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"确认密码:"</span><span class="p">;</span>
+                <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">pass1</span><span class="p">;</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">pass</span><span class="o">==</span><span class="n">pass1</span><span class="p">)</span>
+                    <span class="k">break</span><span class="p">;</span>
+                <span class="k">else</span>
+                    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"两次密码不一致!</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="p">}</span>
+            <span class="n">name</span><span class="o">=</span><span class="s">"name:"</span><span class="o">+</span><span class="n">name</span><span class="p">;</span>
+            <span class="n">pass</span><span class="o">=</span><span class="s">"pass:"</span><span class="o">+</span><span class="n">pass</span><span class="p">;</span>
+            <span class="n">string</span> <span class="n">str</span><span class="o">=</span><span class="n">name</span><span class="o">+</span><span class="n">pass</span><span class="p">;</span>
+            <span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span><span class="n">str</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">str</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"注册成功！</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"</span><span class="se">\n</span><span class="s">继续输入你要的选项:"</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="c1">//登录</span>
+        <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">choice</span><span class="o">==</span><span class="mi">1</span><span class="o">&amp;&amp;!</span><span class="n">if_login</span><span class="p">){</span>
+            <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">){</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"用户名:"</span><span class="p">;</span>
+                <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">name</span><span class="p">;</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"密码:"</span><span class="p">;</span>
+                <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">pass</span><span class="p">;</span>
+                <span class="n">string</span> <span class="n">str</span><span class="o">=</span><span class="s">"login"</span><span class="o">+</span><span class="n">name</span><span class="p">;</span>
+                <span class="n">str</span><span class="o">+=</span><span class="s">"pass:"</span><span class="p">;</span>
+                <span class="n">str</span><span class="o">+=</span><span class="n">pass</span><span class="p">;</span>
+                <span class="n">send</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span><span class="n">str</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">str</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span><span class="c1">//发送登录信息</span>
+                <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+                <span class="n">memset</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">));</span>
+                <span class="n">recv</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span><span class="n">buffer</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span><span class="c1">//接收响应</span>
+                <span class="n">string</span> <span class="n">recv_str</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">recv_str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="o">==</span><span class="s">"ok"</span><span class="p">){</span>
+                    <span class="n">if_login</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span>
+                    <span class="n">login_name</span><span class="o">=</span><span class="n">name</span><span class="p">;</span>
+                    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"登录成功</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+                    <span class="k">break</span><span class="p">;</span>
+                <span class="p">}</span>
+                <span class="k">else</span>
+                    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"密码或用户名错误！</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="c1">//登录成功</span>
+    <span class="k">while</span><span class="p">(</span><span class="n">if_login</span><span class="o">&amp;&amp;</span><span class="mi">1</span><span class="p">){</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">if_login</span><span class="p">){</span>
+            <span class="n">system</span><span class="p">(</span><span class="s">"clear"</span><span class="p">);</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"        欢迎回来,"</span><span class="o">&lt;&lt;</span><span class="n">login_name</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">" -------------------------------------------</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|                                           |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|          请选择你要的选项：               |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|              0:退出                       |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|              1:发起单独聊天               |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|              2:发起群聊                   |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"|                                           |</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">" ------------------------------------------- </span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">choice</span><span class="p">;</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">choice</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="c1">//私聊</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">choice</span><span class="o">==</span><span class="mi">1</span><span class="p">){</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"请输入对方的用户名:"</span><span class="p">;</span>
+            <span class="n">string</span> <span class="n">target_name</span><span class="p">,</span><span class="n">content</span><span class="p">;</span>
+            <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">target_name</span><span class="p">;</span>
+            <span class="n">string</span> <span class="n">sendstr</span><span class="p">(</span><span class="s">"target:"</span><span class="o">+</span><span class="n">target_name</span><span class="o">+</span><span class="s">"from:"</span><span class="o">+</span><span class="n">login_name</span><span class="p">);</span><span class="c1">//标识目标用户+源用户</span>
+            <span class="n">send</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span><span class="n">sendstr</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">sendstr</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span><span class="c1">//先向服务器发送目标用户、源用户</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"请输入你想说的话(输入exit退出)：</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="kr">thread</span> <span class="n">t1</span><span class="p">(</span><span class="n">client</span><span class="o">::</span><span class="n">SendMsg</span><span class="p">,</span><span class="n">conn</span><span class="p">);</span> <span class="c1">//创建发送线程</span>
+            <span class="kr">thread</span> <span class="n">t2</span><span class="p">(</span><span class="n">client</span><span class="o">::</span><span class="n">RecvMsg</span><span class="p">,</span><span class="n">conn</span><span class="p">);</span><span class="c1">//创建接收线程</span>
+            <span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+            <span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">sock</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h3 id="服务端">服务端</h3>
+<ol>
+  <li>在接收消息的函数中建立一个tuple用于存储客户端状态，包含用户是否已经登录，用户名，目标用户名，目标用户套接字描述符；</li>
+  <li>为服务端类创建一个静态unordered_map类型变量用于存储用户名和套接字描述符的映射；</li>
+  <li>在服务端类创建互斥锁，使用posix的pthread_mutex_t类型，且为静态成员，在服务端构造函数中使用函数<code class="language-plaintext highlighter-rouge">int pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);</code>初始化；</li>
+  <li>对HandleRequests函数做如下修改：<br />
+ a. 对于HandleRequests函数中处理登录模块，在对用户名和密码核对无误后，
+    ==&gt; 使用函数<code class="language-plaintext highlighter-rouge">int pthread_mutex_lock(pthread_mutex_t *mutex);</code>申请对前述互斥锁加锁，再将用户名和套接字描述符存储到上述unordered_map，  <br />
+    ==&gt; 最后使用函数<code class="language-plaintext highlighter-rouge">int pthread_mutex_unlock(pthread_mutex_t *mutex);</code>释放上述互斥锁；   <br />
+ b. 对于HandleRequests中处理建立私聊请求模块，先解析目标用户名，再从unordered_map中以用户名为键值查找对应的套接字描述符，找到保存；  <br />
+    ==&gt; <code class="language-plaintext highlighter-rouge">iterator find ( const key_type&amp; k );</code>如果存在该映射则返回对应迭代器，否则返回<code class="language-plaintext highlighter-rouge">unordered_map::end</code>   <br />
+    利用此函数判断是否存在该映射若不存在则报错，否则直接使用<code class="language-plaintext highlighter-rouge">name_sock_map[target]</code>得到套接字描述符；  <br />
+ c. 对于发送消息的函数，先判断之前对建立私聊的请求处理后是否得到了目标套接字描述符，如果没有则此时再尝试获取一次，若获取失败则报错，否则解析消息内容发送给目标套接字；  <br />
+ d. 处理完请求后更新客户端状态；</li>
+</ol>
+
+<h4 id="code-1">Code</h4>
+<p>服务端定义：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">"server.h"</span><span class="cp">
+</span>
+<span class="n">vector</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span> <span class="n">server</span><span class="o">::</span><span class="n">sock_arr</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span><span class="nb">false</span><span class="p">);</span>
+<span class="n">unordered_map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span><span class="kt">int</span><span class="o">&gt;</span> <span class="n">server</span><span class="o">::</span><span class="n">name_sock_map</span><span class="p">;</span><span class="c1">//名字和套接字描述符</span>
+<span class="n">pthread_mutex_t</span> <span class="n">server</span><span class="o">::</span><span class="n">name_sock_mutx</span><span class="p">;</span><span class="c1">//互斥锁，锁住需要修改name_sock_map的临界区</span>
+
+<span class="n">server</span><span class="o">::</span><span class="n">server</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">)</span><span class="o">:</span><span class="n">server_port</span><span class="p">(</span><span class="n">port</span><span class="p">),</span><span class="n">server_ip</span><span class="p">(</span><span class="n">ip</span><span class="p">){</span>
+    <span class="n">pthread_mutex_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">name_sock_mutx</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span> <span class="c1">//创建互斥锁</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>HandleRequests函数：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="n">server</span><span class="o">::</span><span class="n">HandleRequest</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">,</span><span class="n">string</span> <span class="n">str</span><span class="p">,</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">bool</span><span class="p">,</span><span class="n">string</span><span class="p">,</span><span class="n">string</span><span class="p">,</span><span class="kt">int</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">info</span><span class="p">){</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+    <span class="n">string</span> <span class="n">name</span><span class="p">,</span><span class="n">pass</span><span class="p">;</span>
+    <span class="c1">//把参数提出来，方便操作</span>
+    <span class="kt">bool</span> <span class="n">if_login</span><span class="o">=</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">);</span><span class="c1">//记录当前服务对象是否成功登录</span>
+    <span class="n">string</span> <span class="n">login_name</span><span class="o">=</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">);</span><span class="c1">//记录当前服务对象的名字</span>
+    <span class="n">string</span> <span class="n">target_name</span><span class="o">=</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">);</span><span class="c1">//记录目标对象的名字</span>
+    <span class="kt">int</span> <span class="n">target_conn</span><span class="o">=</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">);</span><span class="c1">//目标对象的套接字描述符</span>
+
+    <span class="c1">//连接MYSQL数据库</span>
+    <span class="n">MYSQL</span> <span class="o">*</span><span class="n">con</span><span class="o">=</span><span class="n">mysql_init</span><span class="p">(</span><span class="nb">NULL</span><span class="p">);</span>
+    <span class="n">mysql_real_connect</span><span class="p">(</span><span class="n">con</span><span class="p">,</span><span class="s">"127.0.0.1"</span><span class="p">,</span><span class="s">"root"</span><span class="p">,</span><span class="s">""</span><span class="p">,</span><span class="s">"ChatProject"</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="nb">NULL</span><span class="p">,</span><span class="n">CLIENT_MULTI_STATEMENTS</span><span class="p">);</span>
+
+    <span class="c1">//注册</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"name:"</span><span class="p">)</span><span class="o">!=</span><span class="n">str</span><span class="p">.</span><span class="n">npos</span><span class="p">){</span>
+        <span class="kt">int</span> <span class="n">p1</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"name:"</span><span class="p">),</span><span class="n">p2</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"pass:"</span><span class="p">);</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="n">p1</span><span class="o">+</span><span class="mi">5</span><span class="p">,</span><span class="n">p2</span><span class="o">-</span><span class="mi">5</span><span class="p">);</span>
+        <span class="n">pass</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="n">p2</span><span class="o">+</span><span class="mi">5</span><span class="p">,</span><span class="n">str</span><span class="p">.</span><span class="n">length</span><span class="p">()</span><span class="o">-</span><span class="n">p2</span><span class="o">-</span><span class="mi">4</span><span class="p">);</span>
+        <span class="n">string</span> <span class="n">search</span><span class="o">=</span><span class="s">"INSERT INTO USER VALUES (</span><span class="se">\"</span><span class="s">"</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="n">name</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="s">"</span><span class="se">\"</span><span class="s">,</span><span class="se">\"</span><span class="s">"</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="n">pass</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="s">"</span><span class="se">\"</span><span class="s">);"</span><span class="p">;</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"sql语句:"</span><span class="o">&lt;&lt;</span><span class="n">search</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+        <span class="n">mysql_query</span><span class="p">(</span><span class="n">con</span><span class="p">,</span><span class="n">search</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+    <span class="p">}</span>
+    <span class="c1">//登录</span>
+    <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"login"</span><span class="p">)</span><span class="o">!=</span><span class="n">str</span><span class="p">.</span><span class="n">npos</span><span class="p">){</span>
+        <span class="kt">int</span> <span class="n">p1</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"login"</span><span class="p">),</span><span class="n">p2</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"pass:"</span><span class="p">);</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="n">p1</span><span class="o">+</span><span class="mi">5</span><span class="p">,</span><span class="n">p2</span><span class="o">-</span><span class="mi">5</span><span class="p">);</span>
+        <span class="n">pass</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="n">p2</span><span class="o">+</span><span class="mi">5</span><span class="p">,</span><span class="n">str</span><span class="p">.</span><span class="n">length</span><span class="p">()</span><span class="o">-</span><span class="n">p2</span><span class="o">-</span><span class="mi">4</span><span class="p">);</span>
+        <span class="n">string</span> <span class="n">search</span><span class="o">=</span><span class="s">"SELECT * FROM USER WHERE NAME=</span><span class="se">\"</span><span class="s">"</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="n">name</span><span class="p">;</span>
+        <span class="n">search</span><span class="o">+=</span><span class="s">"</span><span class="se">\"</span><span class="s">;"</span><span class="p">;</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"sql语句:"</span><span class="o">&lt;&lt;</span><span class="n">search</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+        <span class="k">auto</span> <span class="n">search_res</span><span class="o">=</span><span class="n">mysql_query</span><span class="p">(</span><span class="n">con</span><span class="p">,</span><span class="n">search</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+        <span class="k">auto</span> <span class="n">result</span><span class="o">=</span><span class="n">mysql_store_result</span><span class="p">(</span><span class="n">con</span><span class="p">);</span>
+        <span class="kt">int</span> <span class="n">col</span><span class="o">=</span><span class="n">mysql_num_fields</span><span class="p">(</span><span class="n">result</span><span class="p">);</span><span class="c1">//获取列数</span>
+        <span class="kt">int</span> <span class="n">row</span><span class="o">=</span><span class="n">mysql_num_rows</span><span class="p">(</span><span class="n">result</span><span class="p">);</span><span class="c1">//获取行数</span>
+        <span class="c1">//查询到用户名</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">search_res</span><span class="o">==</span><span class="mi">0</span><span class="o">&amp;&amp;</span><span class="n">row</span><span class="o">!=</span><span class="mi">0</span><span class="p">){</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"查询成功</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="k">auto</span> <span class="n">info</span><span class="o">=</span><span class="n">mysql_fetch_row</span><span class="p">(</span><span class="n">result</span><span class="p">);</span><span class="c1">//获取一行的信息</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"查询到用户名:"</span><span class="o">&lt;&lt;</span><span class="n">info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">&lt;&lt;</span><span class="s">" 密码:"</span><span class="o">&lt;&lt;</span><span class="n">info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+            <span class="c1">//密码正确</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">==</span><span class="n">pass</span><span class="p">){</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"登录密码正确</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+                <span class="n">string</span> <span class="n">str1</span><span class="o">=</span><span class="s">"ok"</span><span class="p">;</span>
+                <span class="n">if_login</span><span class="o">=</span><span class="nb">true</span><span class="p">;</span>
+                <span class="n">login_name</span><span class="o">=</span><span class="n">name</span><span class="p">;</span>
+                <span class="n">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">name_sock_mutx</span><span class="p">);</span> <span class="c1">//上锁</span>
+                <span class="n">name_sock_map</span><span class="p">[</span><span class="n">login_name</span><span class="p">]</span><span class="o">=</span><span class="n">conn</span><span class="p">;</span><span class="c1">//记录下名字和文件描述符的对应关系</span>
+                <span class="n">pthread_mutex_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">name_sock_mutx</span><span class="p">);</span> <span class="c1">//解锁</span>
+                <span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span><span class="n">str1</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">str1</span><span class="p">.</span><span class="n">length</span><span class="p">()</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+            <span class="p">}</span>
+            <span class="c1">//密码错误</span>
+            <span class="k">else</span><span class="p">{</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"登录密码错误</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+                <span class="kt">char</span> <span class="n">str1</span><span class="p">[</span><span class="mi">100</span><span class="p">]</span><span class="o">=</span><span class="s">"wrong"</span><span class="p">;</span>
+                <span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span><span class="n">str1</span><span class="p">,</span><span class="n">strlen</span><span class="p">(</span><span class="n">str1</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="c1">//没找到用户名</span>
+        <span class="k">else</span><span class="p">{</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"查询失败</span><span class="se">\n\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="kt">char</span> <span class="n">str1</span><span class="p">[</span><span class="mi">100</span><span class="p">]</span><span class="o">=</span><span class="s">"wrong"</span><span class="p">;</span>
+            <span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span><span class="n">str1</span><span class="p">,</span><span class="n">strlen</span><span class="p">(</span><span class="n">str1</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="c1">//设定目标的文件描述符</span>
+    <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"target:"</span><span class="p">)</span><span class="o">!=</span><span class="n">str</span><span class="p">.</span><span class="n">npos</span><span class="p">){</span>
+        <span class="kt">int</span> <span class="n">pos1</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"from"</span><span class="p">);</span>
+        <span class="n">string</span> <span class="n">target</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="n">pos1</span><span class="o">-</span><span class="mi">7</span><span class="p">),</span><span class="n">from</span><span class="o">=</span><span class="n">str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="n">pos1</span><span class="o">+</span><span class="mi">4</span><span class="p">);</span>
+        <span class="n">target_name</span><span class="o">=</span><span class="n">target</span><span class="p">;</span>
+        <span class="c1">//找不到这个目标</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">name_sock_map</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="n">target</span><span class="p">)</span><span class="o">==</span><span class="n">name_sock_map</span><span class="p">.</span><span class="n">end</span><span class="p">())</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"源用户为"</span><span class="o">&lt;&lt;</span><span class="n">login_name</span><span class="o">&lt;&lt;</span><span class="s">",目标用户"</span><span class="o">&lt;&lt;</span><span class="n">target_name</span><span class="o">&lt;&lt;</span><span class="s">"仍未登录，无法发起私聊</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+        <span class="c1">//找到了目标</span>
+        <span class="k">else</span><span class="p">{</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"源用户"</span><span class="o">&lt;&lt;</span><span class="n">login_name</span><span class="o">&lt;&lt;</span><span class="s">"向目标用户"</span><span class="o">&lt;&lt;</span><span class="n">target_name</span><span class="o">&lt;&lt;</span><span class="s">"发起的私聊即将建立"</span><span class="p">;</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">",目标用户的套接字描述符为"</span><span class="o">&lt;&lt;</span><span class="n">name_sock_map</span><span class="p">[</span><span class="n">target</span><span class="p">]</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+            <span class="n">target_conn</span><span class="o">=</span><span class="n">name_sock_map</span><span class="p">[</span><span class="n">target</span><span class="p">];</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="c1">//接收到消息，转发</span>
+    <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">str</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">"content:"</span><span class="p">)</span><span class="o">!=</span><span class="n">str</span><span class="p">.</span><span class="n">npos</span><span class="p">){</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">target_conn</span><span class="o">==-</span><span class="mi">1</span><span class="p">){</span>
+            <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"找不到目标用户"</span><span class="o">&lt;&lt;</span><span class="n">target_name</span><span class="o">&lt;&lt;</span><span class="s">"的套接字，将尝试重新寻找目标用户的套接字</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">name_sock_map</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="n">target_name</span><span class="p">)</span><span class="o">!=</span><span class="n">name_sock_map</span><span class="p">.</span><span class="n">end</span><span class="p">()){</span>
+                <span class="n">target_conn</span><span class="o">=</span><span class="n">name_sock_map</span><span class="p">[</span><span class="n">target_name</span><span class="p">];</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"重新查找目标用户套接字成功</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="p">}</span>
+            <span class="k">else</span><span class="p">{</span>
+                <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"查找仍然失败，转发失败！</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="n">string</span> <span class="n">recv_str</span><span class="p">(</span><span class="n">str</span><span class="p">);</span>
+        <span class="n">string</span> <span class="n">send_str</span><span class="o">=</span><span class="n">recv_str</span><span class="p">.</span><span class="n">substr</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"用户"</span><span class="o">&lt;&lt;</span><span class="n">login_name</span><span class="o">&lt;&lt;</span><span class="s">"向"</span><span class="o">&lt;&lt;</span><span class="n">target_name</span><span class="o">&lt;&lt;</span><span class="s">"发送:"</span><span class="o">&lt;&lt;</span><span class="n">send_str</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+        <span class="n">send_str</span><span class="o">=</span><span class="s">"["</span><span class="o">+</span><span class="n">login_name</span><span class="o">+</span><span class="s">"]:"</span><span class="o">+</span><span class="n">send_str</span><span class="p">;</span>
+        <span class="n">send</span><span class="p">(</span><span class="n">target_conn</span><span class="p">,</span><span class="n">send_str</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">send_str</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="c1">//更新实参</span>
+    <span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">)</span><span class="o">=</span><span class="n">if_login</span><span class="p">;</span><span class="c1">//记录当前服务对象是否成功登录</span>
+    <span class="n">get</span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">)</span><span class="o">=</span><span class="n">login_name</span><span class="p">;</span><span class="c1">//记录当前服务对象的名字</span>
+    <span class="n">get</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">)</span><span class="o">=</span><span class="n">target_name</span><span class="p">;</span><span class="c1">//记录目标对象的名字</span>
+    <span class="n">get</span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">(</span><span class="n">info</span><span class="p">)</span><span class="o">=</span><span class="n">target_conn</span><span class="p">;</span><span class="c1">//目标对象的套接字描述符</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+:ET

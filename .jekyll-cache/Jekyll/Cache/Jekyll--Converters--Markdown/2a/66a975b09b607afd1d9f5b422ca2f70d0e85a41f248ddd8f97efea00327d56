@@ -1,0 +1,90 @@
+I"�<hr />
+<p>使用C++连接mysql，尝试在数据库表中插入数据。</p>
+
+<h3 id="启动mysql">启动mysql</h3>
+<p>在macOS上使用homebrew安装的mysql，使用<code class="language-plaintext highlighter-rouge">brew services start mysql </code>启动mysql：</p>
+<div align="left">
+    <img src="/images/mysql01.png" width="80%" />
+</div>
+
+<h3 id="创建数据库并建表">创建数据库并建表</h3>
+<div align="left">
+    <img src="/images/mysql02.png" width="50%" />
+</div>
+<div align="left">
+    <img src="/images/mysql03.png" width="50%" />
+</div>
+
+<h3 id="c连接mysql">c++连接mysql</h3>
+<p>连接数据库并向数据库表user中插入一条数据；</p>
+
+<p>用到的函数：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MYSQL</span> <span class="o">*</span><span class="n">mysql_init</span><span class="p">(</span><span class="n">MYSQL</span> <span class="o">*</span><span class="n">mysql</span><span class="p">)</span>
+<span class="cm">/*
+   分配或初始化与mysql_real_connect()相适应的MYSQL对象。
+   如果mysql是NULL指针，该函数将分配、初始化、并返回新对象。否则，将初始化对象，并返回对象的地址。
+   如果mysql_init()分配了新的对象，当调用mysql_close()来关闭连接时。将释放该对象。
+   */</span>
+</code></pre></div></div>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MYSQL</span> <span class="o">*</span>
+<span class="n">mysql_real_connect</span><span class="p">(</span>
+        <span class="n">MYSQL</span> <span class="o">*</span><span class="n">mysql</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">host</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">user</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">passwd</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">db</span><span class="p">,</span> 
+        <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">port</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">unix_socket</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="kt">long</span> <span class="n">client_flag</span><span class="p">)</span>
+<span class="cm">/*
+ “host”的值必须是主机名或IP地址。
+如果“host”是NULL或字符串"localhost"，连接将被视为与本地主机的连接。如果操作系统支持套接字（Unix）或命名管道（Windows），将使用它们而不是TCP/IP连接到服务器。
+如果“port”不是0，其值将用作TCP/IP连接的端口号。注意，“host”参数决定了连接的类型。
+如果unix_socket不是NULL，该字符串描述了应使用的套接字或命名管道。注意，“host”参数决定了连接的类型。
+CLIENT_MULTI_STATEMENTS
+通知服务器，客户端可能在单个字符串内发送多条语句（由‘;’隔开）。如果未设置该标志，将禁止多语句执行。
+ */</span>
+</code></pre></div></div>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="n">mysql_query</span><span class="p">(</span><span class="n">MYSQL</span> <span class="o">*</span><span class="n">mysql</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">query</span><span class="p">)</span>
+<span class="cm">/*
+mysql_query()不能用于包含二进制数据的查询，应使用mysql_real_query()取而代之（二进制数据可能包含字符‘\0’，mysql_query()会将该字符解释为查询字符串结束）。
+如果查询成功，返回0。如果出现错误，返回非0值。
+ */</span>
+</code></pre></div></div>
+
+<p>最终代码：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span><span class="cpf">&lt;iostream&gt;</span><span class="cp">
+#include</span><span class="cpf">&lt;mysql.h&gt;</span><span class="cp">
+#include</span><span class="cpf">&lt;string&gt;</span><span class="cp">
+</span><span class="k">using</span> <span class="k">namespace</span> <span class="n">std</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">MYSQL</span> <span class="o">*</span><span class="n">con</span> <span class="o">=</span> <span class="n">mysql_init</span><span class="p">(</span><span class="nb">NULL</span><span class="p">);</span>
+    <span class="n">mysql_real_connect</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="s">"127.0.0.1"</span><span class="p">,</span> <span class="s">"root"</span><span class="p">,</span> <span class="s">""</span><span class="p">,</span> <span class="s">"ChatProject"</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLIENT_MULTI_STATEMENTS</span><span class="p">);</span>
+    <span class="n">string</span> <span class="n">sql</span> <span class="o">=</span> <span class="s">"insert into user values('bbbb', 'ddddd')"</span><span class="p">;</span>
+    <span class="n">mysql_query</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">sql</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h3 id="makefile">makefile</h3>
+<p> 找到mysql安装位置的头文件和库文件目录，编译和链接时要引用，指定链接库文件libmysqlclient</p>
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>CC <span class="o">=</span> /usr/bin/clang++
+CFLAGS <span class="o">=</span> <span class="nt">-Wall</span> <span class="nt">-O0</span> <span class="nt">-I</span>/usr/local/Cellar/mysql/8.0.28/include/mysql <span class="nt">-v</span>
+LIBS <span class="o">=</span> <span class="nt">-L</span>/usr/local/Cellar/mysql/8.0.28/lib
+
+msqltest: 
+	<span class="k">${</span><span class="nv">CC</span><span class="k">}</span> <span class="k">${</span><span class="nv">CFLAGS</span><span class="k">}</span> <span class="nt">-o</span> msqltest msqltest.cpp <span class="k">${</span><span class="nv">LIBS</span><span class="k">}</span> <span class="nt">-lmysqlclient</span>
+
+clean:
+	<span class="nb">rm </span>msqltest
+</code></pre></div></div>
+
+<h3 id="程序运行前表中数据">程序运行前表中数据</h3>
+<div align="left">
+    <img src="/images/mysql04.png" width="30%" />
+</div>
+
+<h3 id="编译并运行程序">编译并运行程序</h3>
+<div align="left">
+    <img src="/images/mysql05.png" width="50%" />
+</div>
+<div align="left">
+    <img src="/images/mysql06.png" width="30%" />
+</div>
+
+:ET

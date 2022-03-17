@@ -1,0 +1,158 @@
+<hr />
+
+<p>接上篇：<a href="/myblogs/客户端和服务端TCP通信(C++,-socket)">客户端和服务端TCP通信(C++)</a>，运用面向对象思想和多线程编程重写服务端。将服务端抽象为一个c++类，并且实现服务端的并发性，即服务端可以为多个客户端服务。</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 定义和初始化一个服务端对象，指定服务端IP和端口号即可；
+2. 服务器对象启动，服务器对象运行过程中每收到一个与该服务端对象建立连接请求都创建一个线程专门服务该客户端对象即接收来自该客户端的消息；  
+</code></pre></div></div>
+
+<p>服务端应具有的属性：服务端的ip, 端口号，服务端的套接字描述符，与服务端成功建立连接的客户端的套接字描述符；服务端还应该有一个用于接收客户端消息的函数；另外还应该定义一个用于启动服务端对象，开始监听的成员函数；服务端类的构造函数应该完成服务端属性的初始化；析构函数需要关闭服务端的套接字描述符和所有与该服务端对象连接的客户端对象的套接字描述符。</p>
+
+<p>服务端ip可以用string存储，端口号和套接字描述符用int存储，客户端的套接字描述符存储在vector<int>；启动服务端对象的函数用到了对象相关数据，故应定义为普通的成员函数，</int></p>
+
+<p>启动服务端对象的步骤为：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 创建套接字描述符以初始化服务端对象中的套接字描述符；
+2. 创建网络地址并用该对象属性中的IP和端口号初始化；
+3. 绑定该对象的套接字描述符和刚创建的网络地址；
+4. 将该对象的套接字描述符设置为监听状态；
+5. 创建循环：
+    a. 获取申请建立连接的客户端套接字描述符；
+    b. 若成功获取套接字描述符则将其加入该服务端对象的成功连接客户端列表中，否则退出；
+    c. 创建线程用以接收刚刚连接成功的客户端的消息；
+    d. 将接收消息的线程与主线程分离，进入下一轮循环。
+</code></pre></div></div>
+
+<p>用于接收消息的函数对与所有服务端对象拥有相同的操作逻辑且没有与具体对象相关的数据，因此可以将其定义为静态函数，接收一个参数即欲接收其消息的客户端的套接字描述符：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 先创建一个缓冲区用于暂存接收的数据，
+2. 要不停接收消息故创建循环：
+    a. 重置缓冲区；
+    b. 从客户端套接字读取数据，写入缓冲区；
+    c. 根据读取字符串判断是否终止连接；
+    d. 打印接收的消息；   
+</code></pre></div></div>
+
+<p>创建线程使用库函数thread时，初始化thread对象后，应调用函数thread.detach()而不应该调用join()。每一个线程服务一个客户端，服务端与该客户端的连接结束即可销毁此线程，主线程还要处理与其它客户端的连接，所以不应该在此阻塞。</p>
+
+<h3 id="code">Code</h3>
+
+<p>类的定义：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#ifndef SERVER_H
+#define SERVER_H
+</span>
+<span class="cp">#include</span> <span class="cpf">&lt;sys/types.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/socket.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;netinet/in.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;arpa/inet.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;unistd.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;string.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdlib.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;fcntl.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/shm.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;thread&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp">
+</span><span class="k">using</span> <span class="k">namespace</span> <span class="n">std</span><span class="p">;</span>
+<span class="k">class</span> <span class="nc">server</span><span class="p">{</span>
+    <span class="nl">private:</span>
+        <span class="kt">int</span> <span class="n">server_port</span><span class="p">;</span><span class="c1">//服务器端口号</span>
+        <span class="kt">int</span> <span class="n">server_sockfd</span><span class="p">;</span><span class="c1">//设为listen状态的套接字描述符</span>
+        <span class="n">string</span> <span class="n">server_ip</span><span class="p">;</span><span class="c1">//服务器ip</span>
+        <span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span> <span class="n">sock_arr</span><span class="p">;</span><span class="c1">//保存所有套接字描述符</span>
+    <span class="nl">public:</span>
+        <span class="n">server</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">);</span><span class="c1">//构造函数</span>
+        <span class="o">~</span><span class="n">server</span><span class="p">();</span><span class="c1">//析构函数</span>
+        <span class="kt">void</span> <span class="n">run</span><span class="p">();</span><span class="c1">//服务器开始服务</span>
+        <span class="k">static</span> <span class="kt">void</span> <span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">);</span><span class="c1">//子线程工作的静态函数</span>
+<span class="p">};</span>
+
+<span class="cp">#endif
+</span></code></pre></div></div>
+
+<p>具体实现：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">"server.h"</span><span class="cp">
+</span>
+<span class="c1">//构造函数</span>
+<span class="n">server</span><span class="o">::</span><span class="n">server</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">)</span><span class="o">:</span><span class="n">server_port</span><span class="p">(</span><span class="n">port</span><span class="p">),</span><span class="n">server_ip</span><span class="p">(</span><span class="n">ip</span><span class="p">){}</span>
+
+<span class="c1">//析构函数</span>
+<span class="n">server</span><span class="o">::~</span><span class="n">server</span><span class="p">(){</span>
+    <span class="k">for</span><span class="p">(</span><span class="k">auto</span> <span class="n">conn</span><span class="o">:</span><span class="n">sock_arr</span><span class="p">)</span>
+        <span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">);</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">//服务器开始服务</span>
+<span class="kt">void</span> <span class="n">server</span><span class="o">::</span><span class="n">run</span><span class="p">(){</span>
+    <span class="c1">//定义sockfd</span>
+    <span class="n">server_sockfd</span> <span class="o">=</span> <span class="n">socket</span><span class="p">(</span><span class="n">AF_INET</span><span class="p">,</span><span class="n">SOCK_STREAM</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="c1">//定义sockaddr_in</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">server_sockaddr</span><span class="p">;</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_family</span> <span class="o">=</span> <span class="n">AF_INET</span><span class="p">;</span><span class="c1">//TCP/IP协议族</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_port</span> <span class="o">=</span> <span class="n">htons</span><span class="p">(</span><span class="n">server_port</span><span class="p">);</span><span class="c1">//server_port;//端口号</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_addr</span><span class="p">.</span><span class="n">s_addr</span> <span class="o">=</span> <span class="n">inet_addr</span><span class="p">(</span><span class="n">server_ip</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span><span class="c1">//ip地址，127.0.0.1是环回地址，相当于本机ip</span>
+
+    <span class="c1">//bind，成功返回0，出错返回-1</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">bind</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,(</span><span class="k">struct</span> <span class="nc">sockaddr</span> <span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">server_sockaddr</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">server_sockaddr</span><span class="p">))</span><span class="o">==-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"bind"</span><span class="p">);</span><span class="c1">//输出错误原因</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+    <span class="p">}</span>
+
+    <span class="c1">//listen，成功返回0，出错返回-1</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">listen</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,</span><span class="mi">20</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"listen"</span><span class="p">);</span><span class="c1">//输出错误原因</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+    <span class="p">}</span>
+
+    <span class="c1">//客户端套接字</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">client_addr</span><span class="p">;</span>
+    <span class="n">socklen_t</span> <span class="n">length</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">client_addr</span><span class="p">);</span>
+
+    <span class="c1">//不断取出新连接并创建子线程为其服务</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">){</span>
+        <span class="kt">int</span> <span class="n">conn</span> <span class="o">=</span> <span class="n">accept</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,</span> <span class="p">(</span><span class="k">struct</span> <span class="nc">sockaddr</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">client_addr</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">length</span><span class="p">);</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">conn</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">perror</span><span class="p">(</span><span class="s">"connect"</span><span class="p">);</span><span class="c1">//输出错误原因</span>
+            <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+        <span class="p">}</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"文件描述符为"</span><span class="o">&lt;&lt;</span><span class="n">conn</span><span class="o">&lt;&lt;</span><span class="s">"的客户端成功连接</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+        <span class="n">sock_arr</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">conn</span><span class="p">);</span>
+        <span class="c1">//创建线程</span>
+        <span class="kr">thread</span> <span class="n">t</span><span class="p">(</span><span class="n">server</span><span class="o">::</span><span class="n">RecvMsg</span><span class="p">,</span><span class="n">conn</span><span class="p">);</span>
+        <span class="n">t</span><span class="p">.</span><span class="n">detach</span><span class="p">();</span><span class="c1">//置为分离状态，不能用join，join会导致主线程阻塞</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">//子线程工作的静态函数</span>
+<span class="c1">//注意，前面不用加static，否则会编译报错</span>
+<span class="kt">void</span> <span class="n">server</span><span class="o">::</span><span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">){</span>
+    <span class="c1">//接收缓冲区</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+    <span class="c1">//不断接收数据</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">));</span>
+        <span class="kt">int</span> <span class="n">len</span> <span class="o">=</span> <span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="c1">//客户端发送exit或者异常结束时，退出</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="s">"exit"</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span> <span class="o">||</span> <span class="n">len</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"收到套接字描述符为"</span><span class="o">&lt;&lt;</span><span class="n">conn</span><span class="o">&lt;&lt;</span><span class="s">"发来的信息："</span><span class="o">&lt;&lt;</span><span class="n">buffer</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>主函数：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span><span class="cpf">"server.h"</span><span class="cp">
+</span><span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+    <span class="n">server</span> <span class="n">serv</span><span class="p">(</span><span class="mi">8023</span><span class="p">,</span><span class="s">"127.0.0.1"</span><span class="p">);</span><span class="c1">//创建实例，传入端口号和ip作为构造函数参数</span>
+    <span class="n">serv</span><span class="p">.</span><span class="n">run</span><span class="p">();</span><span class="c1">//启动服务</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>下一篇：<a href="/myblogs/客户端(多线程-面向对象)">客户端(多线程，面向对象)</a></p>

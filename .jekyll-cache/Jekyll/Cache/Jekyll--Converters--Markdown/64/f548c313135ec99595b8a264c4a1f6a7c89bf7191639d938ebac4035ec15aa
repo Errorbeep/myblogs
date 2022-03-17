@@ -1,0 +1,244 @@
+I"�V<hr />
+<p>实现客户端和服务端简单的TCP通信，
+网络编程中我们一般会使用 C/S 架构，即包含服务器端和客户端。</p>
+
+<ul>
+  <li>TCP 网络编程的服务器端</li>
+</ul>
+
+<p>服务器端一般先用 socket 创建一个套接字，然后用 bind 给这个套接字绑定地址（即 ip+端口号），然后调用 listen 把这个套接字置为监听状态，随后调用 accept 函数从已完成连接队列中取出成功建立连接的套接字，以后就在这个新的套接字上调用 send、recv 来发送数据、接收数据，最后调用 close 来断开连接释放资源即可。</p>
+
+<h3 id="servercpp">server.cpp</h3>
+<h4 id="procedure">Procedure</h4>
+<ol>
+  <li>构造一个套接字描述符；<br />
+==&gt; <code class="language-plaintext highlighter-rouge">int socket(int domain, int type, int protocol);</code></li>
+  <li>构造一个网络地址A以存储服务端地址；<br />
+==&gt; <code class="language-plaintext highlighter-rouge">struct sockaddr_in;</code></li>
+  <li>绑定上述套接字描述符和网络地址A； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int bind(int sock_fd, struct sockaddr * sock_addr, int addr_len);</code></li>
+  <li>将套接字描述符置于监听状态；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int listen(int sock_fd, int backlog);</code></li>
+  <li>构造一个网络地址B用以存储客户端地址；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">struct sockaddr_in;</code></li>
+  <li>将申请与服务端建立连接的客户端地址存储到网络地址B中，并为该客户端套接字分配描述符； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int accept(int server_fd, struct sockaddr * sock_add, int* addr_len);</code></li>
+  <li>建立缓冲区； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">char buffer[1000];</code></li>
+  <li>创建循环：
+    <ol>
+      <li>重新初始化缓冲区； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">void*  memset(void *s, int ch, size_t n);</code></li>
+      <li>从客户端读取数据存到缓冲区中； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int recv(int cli_fd, void* buffer, size_t length, unsigned int flag);</code></li>
+      <li>检查读取数据长度，判断客户端是否发出退出提示；</li>
+      <li>输出客户端数据；</li>
+    </ol>
+  </li>
+  <li>关闭本进程服务端和客户端套接字描述符；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int close(int fd);</code></li>
+</ol>
+
+<h4 id="code">Code</h4>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;sys/types.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/socket.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;netinet/in.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;arpa/inet.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;unistd.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;string.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdlib.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;fcntl.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/shm.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span><span class="k">using</span> <span class="k">namespace</span> <span class="n">std</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">//1. 构造一个套接字描述符；</span>
+    <span class="c1">//定义sockfd</span>
+    <span class="kt">int</span> <span class="n">server_sockfd</span> <span class="o">=</span> <span class="n">socket</span><span class="p">(</span><span class="n">AF_INET</span><span class="p">,</span><span class="n">SOCK_STREAM</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="cm">/*
+        It's Ok to use PF_INET(Protocol Family) to initialize a socket as well as AF_INET(Address Family)
+        int socket(int domain, int type, int Protocol);
+        需要指明使用的协议栈， 服务类型（数据报服务: SOCK_DGRAM，数据流服务: SOCK_STREAM），
+        使用的协议（一般取0，即系统默认）; 返回一个整型即Socket描述符。
+    */</span>
+
+    <span class="c1">// 2. 构造一个网络地址A以存储服务端地址；</span>
+    <span class="c1">//定义sockaddr_in</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">server_sockaddr</span><span class="p">;</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_family</span> <span class="o">=</span> <span class="n">AF_INET</span><span class="p">;</span><span class="c1">//TCP/IP协议族</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_port</span> <span class="o">=</span> <span class="n">htons</span><span class="p">(</span><span class="mi">8023</span><span class="p">);</span><span class="c1">//端口号 host to net, short; 从主机字节序转化为网络字节序</span>
+    <span class="n">server_sockaddr</span><span class="p">.</span><span class="n">sin_addr</span><span class="p">.</span><span class="n">s_addr</span> <span class="o">=</span> <span class="n">inet_addr</span><span class="p">(</span><span class="s">"127.0.0.1"</span><span class="p">);</span><span class="c1">//ip地址，127.0.0.1是环回地址，相当于本机ip</span>
+
+    <span class="c1">//3. 绑定上述套接字描述符和网络地址A；</span>
+    <span class="c1">//bind，成功返回0，出错返回-1</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">bind</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,(</span><span class="k">struct</span> <span class="nc">sockaddr</span> <span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">server_sockaddr</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">server_sockaddr</span><span class="p">))</span><span class="o">==-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"bind"</span><span class="p">);</span><span class="c1">//输出错误原因到stderr</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+    <span class="p">}</span>
+    <span class="cm">/*
+        int bind(int sock_fd, struct sockaddr * sock_adrr, int length);
+        指明要绑定的套接字，地址，地址长度
+    */</span>
+
+    <span class="c1">//4. 将套接字描述符置于监听状态；</span>
+    <span class="c1">//listen，成功返回0，出错返回-1</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">listen</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,</span><span class="mi">20</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"listen"</span><span class="p">);</span><span class="c1">//输出错误原因到stderr</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+    <span class="p">}</span>
+    <span class="cm">/*
+        int listen(int sock_fd, int backlog);
+        将套接字置于监听状态，backlog为accept队列长度
+    */</span>
+
+    <span class="c1">//5. 构造一个网络地址B用以存储客户端地址；</span>
+    <span class="c1">//客户端网络地址</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">client_addr</span><span class="p">;</span>
+    <span class="n">socklen_t</span> <span class="n">length</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">client_addr</span><span class="p">);</span>
+
+    <span class="c1">//6. 将申请与服务端建立连接的客户端地址存储到网络地址B中，并为该客户端套接字分配描述符；</span>
+    <span class="c1">//成功返回非负描述字，出错返回-1</span>
+    <span class="kt">int</span> <span class="n">conn</span> <span class="o">=</span> <span class="n">accept</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">,</span> <span class="p">(</span><span class="k">struct</span> <span class="nc">sockaddr</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">client_addr</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">length</span><span class="p">);</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">conn</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"connect"</span><span class="p">);</span><span class="c1">//输出错误原因</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="c1">//结束程序</span>
+    <span class="p">}</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"客户端成功连接</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="cm">/*
+        int accept(int server_sock_fd, struct sockaddr * client_addr, int * addr_length);
+        指明服务器套接字描述符，用于存放客户端地址的地址，地址长度, 返回客户端套接字描述符
+    */</span>
+
+    <span class="c1">//7. 建立缓冲区；</span>
+    <span class="c1">//接收缓冲区</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+
+    <span class="c1">//8. 创建循环：</span>
+    <span class="c1">//不断接收数据</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="c1">//1. 重新初始化缓冲区；</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">));</span>
+        <span class="c1">//2. 从客户端读取数据存到缓冲区中；</span>
+        <span class="kt">int</span> <span class="n">len</span> <span class="o">=</span> <span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="c1">//3. 检查读取数据长度，判断客户端是否发出退出提示；</span>
+        <span class="c1">//客户端发送exit或者异常结束时，退出</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="s">"exit"</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span> <span class="o">||</span> <span class="n">len</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="c1">//4. 输出客户端数据；</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"收到客户端信息："</span><span class="o">&lt;&lt;</span><span class="n">buffer</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="cm">/*
+        int recv(int sock_fd, void* buffer, int buff_len, unsigned int flag);
+        指明套接字描述符，用于存放的缓存地址，缓存区大小，flag默认0，返回接收到的数据长度 
+    */</span>
+    <span class="c1">//9. 关闭本进程服务端和客户端套接字描述符</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">);</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">);</span>
+    <span class="c1">// 可能会有多个进程共享同一个套接字，close会将套接字的引用减一，当引用数量为0时，关闭连接并撤销关键字</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<ul>
+  <li>TCP 网络编程的客户端</li>
+</ul>
+
+<p>与服务器不同，客户端并不需要 bind 绑定地址，因为端口号是系统自动分配的，而且客户端也不需要设置监听的套接字，因此也不需要 listen。客户端在用 socket 创建套接字后直接调用 connect 向服务器发起连接即可，connect 函数通知 Linux 内核完成 TCP 三次握手连接，最后把连接的结果作为返回值。成功建立连接后我们就可以调用 send 和 recv 来发送数据、接收数据，最后调用 close 来断开连接释放资源。</p>
+
+<h3 id="clientcpp">client.cpp</h3>
+<h4 id="procedure-1">Procedure</h4>
+<ol>
+  <li>创建客户端套接字描述符；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int socket(int domain, int type, int protocol);</code></li>
+  <li>创建网络地址并初始化为服务端网络地址；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">struct sockaddr_in;</code></li>
+  <li>申请创建客户端到服务端的连接； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int connect(int client_fd, struct sockaddr_in * server_addr, size_t addr_len);</code></li>
+  <li>创建发送缓冲区；  <br />
+==&gt; <code class="language-plaintext highlighter-rouge">char buffer[1000];</code></li>
+  <li>创建循环：
+    <ol>
+      <li>重置发送缓冲区； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">void* memset(void* s, int ch, size_t n);</code></li>
+      <li>获取外部输入到发送缓冲区；</li>
+      <li>将发送缓冲区内容写入客户端套接字描述符； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int send(int client_fd, const void* buffer, size_t length);</code></li>
+      <li>判断是否输入“exit”；</li>
+    </ol>
+  </li>
+  <li>关闭本进程客户端套接字描述符； <br />
+==&gt; <code class="language-plaintext highlighter-rouge">int close(int fd);</code></li>
+</ol>
+
+<h4 id="code-1">Code</h4>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;sys/types.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/socket.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;netinet/in.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;arpa/inet.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;unistd.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;string.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdlib.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;fcntl.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;sys/shm.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span><span class="k">using</span> <span class="k">namespace</span> <span class="n">std</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// 1. 创建客户端套接字描述符；</span>
+    <span class="c1">//定义sockfd</span>
+    <span class="kt">int</span> <span class="n">sock_cli</span> <span class="o">=</span> <span class="n">socket</span><span class="p">(</span><span class="n">AF_INET</span><span class="p">,</span><span class="n">SOCK_STREAM</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="c1">// 2. 创建网络地址并初始化为服务端网络地址；</span>
+    <span class="c1">//定义sockaddr_in</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">servaddr</span><span class="p">;</span>
+    <span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">servaddr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">servaddr</span><span class="p">));</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_family</span> <span class="o">=</span> <span class="n">AF_INET</span><span class="p">;</span><span class="c1">//TCP/IP协议族</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_port</span> <span class="o">=</span> <span class="n">htons</span><span class="p">(</span><span class="mi">8023</span><span class="p">);</span>  <span class="c1">//服务器端口</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_addr</span><span class="p">.</span><span class="n">s_addr</span> <span class="o">=</span> <span class="n">inet_addr</span><span class="p">(</span><span class="s">"127.0.0.1"</span><span class="p">);</span>  <span class="c1">//服务器ip</span>
+
+    <span class="c1">// 3. 申请创建客户端到服务端的连接;</span>
+    <span class="c1">//连接服务器，成功返回0，错误返回-1</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">connect</span><span class="p">(</span><span class="n">sock_cli</span><span class="p">,</span> <span class="p">(</span><span class="k">struct</span> <span class="nc">sockaddr</span> <span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">servaddr</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">servaddr</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"connect"</span><span class="p">);</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"连接服务器成功！</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="cm">/*
+        int connect(int cli_sock_fd, struct sockaddr * ser_addr, int addr_len);
+    */</span>
+
+    <span class="c1">// 4. 创建发送缓冲区；</span>
+    <span class="kt">char</span> <span class="n">sendbuf</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+    <span class="kt">char</span> <span class="n">recvbuf</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+    <span class="c1">// 5. 创建循环：</span>
+    <span class="k">while</span> <span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+       <span class="c1">// 1. 重置发送缓冲区；</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">));</span>
+       <span class="c1">// 2. 获取外部输入到发送缓冲区；</span>
+        <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">sendbuf</span><span class="p">;</span>
+       <span class="c1">// 3. 将发送缓冲区内容写入客户端套接字描述符；</span>
+        <span class="n">send</span><span class="p">(</span><span class="n">sock_cli</span><span class="p">,</span> <span class="n">sendbuf</span><span class="p">,</span> <span class="n">strlen</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span> <span class="c1">//发送</span>
+       <span class="c1">// 4. 判断是否输入“exit”；</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">,</span><span class="s">"exit"</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="c1">// 6. 关闭本进程客户端套接字描述符；</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">sock_cli</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>下一篇：<a href="/服务端(多线程,-面向对象)">服务端(多线程, 面向对象)</a></p>
+
+:ET

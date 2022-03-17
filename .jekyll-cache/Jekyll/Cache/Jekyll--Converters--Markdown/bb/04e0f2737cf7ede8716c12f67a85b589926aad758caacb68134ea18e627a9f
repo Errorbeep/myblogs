@@ -1,0 +1,949 @@
+I"�
+<h3 id="当前连接数">当前连接数</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">select</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">from</span> <span class="n">v</span><span class="err">$</span><span class="n">process</span><span class="p">;</span>
+<span class="c1">--修改最大连接数（把processes改成500就好了）</span>
+<span class="k">alter</span> <span class="k">system</span> <span class="k">set</span> <span class="n">processes</span> <span class="o">=</span> <span class="mi">500</span> <span class="k">scope</span> <span class="o">=</span> <span class="n">spfile</span><span class="p">;</span>
+<span class="c1">--select value from v$parameter where name = 'processes';</span>
+<span class="c1">--COMMIT;</span>
+<span class="c1">--允许最大连接数 （默认是100）</span>
+<span class="k">select</span> <span class="n">value</span> <span class="k">from</span> <span class="n">v</span><span class="err">$</span><span class="k">parameter</span> <span class="k">where</span> <span class="n">name</span> <span class="o">=</span> <span class="s1">'processes'</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h3 id="查询session信息">查询session信息</h3>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SHOW</span> <span class="k">PARAMETER</span> <span class="k">SESSION</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h3 id="查询processes信息">查询processes信息</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SHOW</span> <span class="k">PARAMETER</span> <span class="n">PROCESS</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="创建表空间">创建表空间</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="n">TABLESPACE</span> <span class="n">TempSpace</span> <span class="n">DATAFILE</span> <span class="s1">'E:</span><span class="se">\S</span><span class="s1">orcery</span><span class="se">\N</span><span class="s1">ecromancy</span><span class="se">\D</span><span class="s1">ataBase</span><span class="se">\d</span><span class="s1">ata</span><span class="se">\T</span><span class="s1">empSpace_DATA.DBF'</span> <span class="k">SIZE</span> <span class="mi">50</span><span class="n">M</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="创建用户">创建用户</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">USER</span> <span class="n">user1</span> <span class="n">IDENTIFIED</span> <span class="k">BY</span> <span class="n">user1</span> <span class="k">DEFAULT</span> <span class="n">TABLESPACE</span> <span class="n">TempSpace</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="授予用户dba权限">授予用户DBA权限</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">GRANT</span> <span class="n">DBA</span> <span class="k">TO</span> <span class="n">user1</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="创建表">创建表</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="k">Temp</span>
+<span class="p">(</span>
+  <span class="n">sno</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span>
+  <span class="n">sname</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">13</span><span class="p">)</span> <span class="k">UNIQUE</span><span class="p">,</span>
+  <span class="n">gender</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="k">CHECK</span><span class="p">(</span><span class="n">gender</span> <span class="k">in</span> <span class="p">(</span><span class="s1">'男'</span><span class="p">,</span> <span class="s1">'女'</span><span class="p">)),</span>
+  <span class="n">dept</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">14</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+  <span class="n">remarks</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span> <span class="k">DEFAULT</span><span class="p">(</span><span class="s1">'三好学生'</span><span class="p">)</span>
+<span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span>
+<span class="p">(</span>
+  <span class="n">sno</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span> <span class="c1">--REFERENCES Temp(sno),</span>
+  <span class="n">cno</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="k">DEFAULT</span><span class="p">(</span><span class="s1">'0001'</span><span class="p">),</span>
+  <span class="n">score</span> <span class="nb">INT</span> <span class="k">DEFAULT</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+  <span class="c1">--CONSTRAINT cno_ScoreTable FOREIGN KEY(cno)REFERENCES Subject(nationkey)</span>
+  
+  <span class="c1">--PRIMARY KEY(sno,cno),/*定义主码*/</span>
+  <span class="c1">-- FOREIGN KEY(sno)REFERENCES Temp(sno),</span>
+  <span class="c1">-- FOREIGN KEY(cno)REFERENCES Subject(cno)</span>
+<span class="p">);</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">ScoreTable</span> <span class="k">VALUES</span><span class="p">(</span><span class="mi">189074010</span><span class="p">,</span> <span class="mi">0001</span><span class="p">,</span> <span class="mi">88</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="p">;</span>
+<span class="k">UPDATE</span> <span class="n">ScoreTable</span> <span class="k">SET</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span><span class="p">;</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">Subject</span>
+<span class="p">(</span>
+  <span class="n">cno</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span>
+  <span class="n">cname</span> <span class="n">VARCHAR2</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="k">UNIQUE</span>
+<span class="p">);</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">Subject</span> <span class="k">MODIFY</span> <span class="n">cname</span> <span class="n">VARCHAR2</span><span class="p">(</span><span class="mi">30</span><span class="p">);</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">Subject</span> <span class="k">VALUES</span><span class="p">(</span><span class="s1">'0008'</span><span class="p">,</span> <span class="s1">'离散数学'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">Subject</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="参照完整性">参照完整性</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">ADD</span> <span class="k">CONSTRAINT</span> <span class="n">sno_const</span> <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="n">sno</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="k">Temp</span><span class="p">(</span><span class="n">sno</span><span class="p">);</span> 
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">ADD</span> <span class="k">CONSTRAINT</span> <span class="n">cno_const</span> <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="n">cno</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">Subject</span><span class="p">(</span><span class="n">cno</span><span class="p">);</span>
+<span class="c1">-- ALTER TABLE ScoreTable DROP CONSTRAINT sno_const;</span>
+</code></pre></div></div>
+<h3 id="修改基本表">修改基本表</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">Temp</span> <span class="k">ADD</span> <span class="k">CONSTRAINT</span> <span class="n">temp_dept_uni</span> <span class="k">UNIQUE</span><span class="p">(</span><span class="n">dept</span><span class="p">);</span><span class="c1">-- 增加约束条件</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">Temp</span> <span class="k">DROP</span> <span class="k">CONSTRAINT</span> <span class="n">temp_dept_uni</span><span class="p">;</span><span class="c1">-- 删除约束条件</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">Subject</span> <span class="k">ADD</span> <span class="n">ctime</span> <span class="nb">INT</span> <span class="k">DEFAULT</span><span class="p">(</span><span class="mi">40</span><span class="p">);</span><span class="c1">-- 增加属性</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">Temp</span> <span class="k">ADD</span> <span class="n">resume</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">30</span><span class="p">);</span><span class="c1">-- 增加属性</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">Temp</span> <span class="k">DROP</span> <span class="k">COLUMN</span> <span class="n">resume</span><span class="p">;</span><span class="c1">-- 删除属性</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">ADD</span> <span class="k">no</span> <span class="nb">INT</span><span class="p">;</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">DROP</span> <span class="k">COLUMN</span> <span class="k">no</span><span class="p">;</span>
+<span class="c1">-- SELECT * FROM ScoreTable;</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">ADD</span> <span class="n">ID</span> <span class="nb">INT</span> <span class="p">;</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">DROP</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">;</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">ScoreTable</span> <span class="k">ADD</span> <span class="k">CONSTRAINT</span> <span class="n">st_prk</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">ID</span><span class="p">);</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">Temp</span> <span class="k">MODIFY</span> <span class="n">sname</span> <span class="n">VARCHAR2</span><span class="p">(</span><span class="mi">14</span><span class="err">）</span><span class="p">;</span> <span class="c1">-- 这样不会去除sname的唯一约束条件</span>
+<span class="c1">-- 如下写法是错误的：</span>
+<span class="c1">-- ALTER TABLE Temp MODIFY sname VARCHAR2(14）UNIQUE;</span>
+</code></pre></div></div>
+<h3 id="删除基本表">删除基本表</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- DROP TABLE Temp;</span>
+</code></pre></div></div>
+<h3 id="向表中插入数据">向表中插入数据</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">INSERT</span> <span class="k">INTO</span> <span class="k">Temp</span> <span class="k">VALUES</span><span class="p">(</span><span class="s1">'189074004'</span><span class="p">,</span> <span class="s1">'Jim'</span><span class="p">,</span> <span class="s1">'男'</span><span class="p">,</span> <span class="s1">'机械'</span><span class="p">,</span> <span class="s1">'三坏学生'</span><span class="p">);</span><span class="c1">-- 单行插入</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="k">Temp</span><span class="p">(</span><span class="n">sno</span><span class="p">,</span> <span class="n">sname</span><span class="p">,</span> <span class="n">dept</span><span class="p">)</span> <span class="k">VALUES</span><span class="p">(</span><span class="s1">'189074000'</span><span class="p">,</span> <span class="s1">'Jenny'</span><span class="p">,</span> <span class="s1">'机械'</span><span class="p">);</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="k">Temp</span> <span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">Stu</span><span class="p">;</span><span class="c1">-- 多行插入（表间拷贝）</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">XS</span> <span class="k">AS</span> <span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">TEMP</span><span class="p">;</span><span class="c1">-- 创建表XS并插入表Temp中的所有数据</span>
+</code></pre></div></div>
+<h3 id="更改记录">更改记录</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">remarks</span> <span class="o">=</span> <span class="s1">'三好学生'</span><span class="p">;</span><span class="c1">-- 修改所有记录</span>
+<span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">remarks</span> <span class="o">=</span> <span class="s1">'三坏学生'</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074005'</span><span class="p">;</span> 
+<span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">remarks</span> <span class="o">=</span> <span class="s1">'三坏学生'</span><span class="p">,</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'软件工程'</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074006'</span><span class="p">;</span> 
+<span class="k">UPDATE</span> <span class="n">ScoreTable</span> <span class="k">SET</span> <span class="n">ID</span> <span class="o">=</span> <span class="n">to_number</span><span class="p">(</span><span class="n">sno</span><span class="p">)</span>  <span class="o">-</span> <span class="mi">189074000</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="删除记录">删除记录</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">DELETE</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'机械'</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="单表查询">单表查询</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">5</span> <span class="k">FROM</span> <span class="n">DUAL</span><span class="p">;</span><span class="c1">-- 表达式求值</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span> <span class="k">AS</span> <span class="err">学号</span><span class="p">,</span> <span class="n">sname</span> <span class="k">AS</span> <span class="err">姓名</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">dept</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">dept</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span><span class="c1">-- 投影-- DISTINCT 必须放在开头</span>
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span><span class="p">;</span><span class="c1">-- 根据字段sno和score去重</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">credit</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">credit</span> <span class="o">&gt;</span> <span class="mi">50</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">credit</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">credit</span> <span class="k">BETWEEN</span> <span class="mi">55</span> <span class="k">AND</span> <span class="mi">57</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">credit</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">credit</span> <span class="k">NOT</span> <span class="k">BETWEEN</span> <span class="mi">55</span> <span class="k">AND</span> <span class="mi">57</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">dept</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="k">IN</span><span class="p">(</span><span class="s1">'计算机'</span><span class="p">,</span> <span class="s1">'电气'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">dept</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="k">NOT</span> <span class="k">IN</span><span class="p">(</span><span class="s1">'计算机'</span><span class="p">,</span> <span class="s1">'电气'</span><span class="p">);</span>
+</code></pre></div></div>
+<h4 id="模糊查询">模糊查询</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sname</span> <span class="k">LIKE</span> <span class="s1">'%m%'</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sname</span> <span class="k">LIKE</span> <span class="s1">'%m_'</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sname</span> <span class="k">LIKE</span> <span class="s1">'ABC</span><span class="se">\_</span><span class="s1">DEF'</span> <span class="k">ESCAPE</span> <span class="s1">'</span><span class="se">\'</span><span class="s1">;
+--  在mysql中不用加“ESCAPE '</span><span class="err">\</span><span class="s1">'”
+ 
+SELECT sno, credit FROM Temp WHERE credit IS NULL;
+SELECT sno, credit FROM Temp WHERE credit IS NOT NULL;
+</span></code></pre></div></div>
+<h4 id="组函数">组函数</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">AS</span> <span class="err">总人数</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="k">COUNT</span><span class="p">(</span><span class="k">DISTINCT</span> <span class="n">dept</span><span class="p">)</span> <span class="k">AS</span> <span class="err">院系数</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="k">AVG</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span> <span class="k">AS</span> <span class="err">电气专业平均学分</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'电气'</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="k">MAX</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span> <span class="k">AS</span> <span class="err">最高学分</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="k">MIN</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span> <span class="k">AS</span> <span class="err">最低学分</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span><span class="c1">-- 不包括NULL</span>
+<span class="k">SELECT</span> <span class="k">SUM</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span> <span class="k">AS</span> <span class="err">学分之和</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="分组查询">分组查询</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">dept</span> <span class="k">AS</span> <span class="err">系别</span><span class="p">,</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">AS</span> <span class="err">人数</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">dept</span> <span class="k">AS</span> <span class="err">系别</span><span class="p">,</span> <span class="k">AVG</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span> <span class="k">AS</span> <span class="err">均分</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="having子句">HAVING子句</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- WHERE作用于基本表或视图，从中选择满足条件的元组；</span>
+<span class="c1">-- HAVING短语作用于组，从中选择满足条件的组。 </span>
+<span class="k">SELECT</span> <span class="n">dept</span><span class="p">,</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span> <span class="k">HAVING</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="排序">排序</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">sno</span> <span class="k">ASC</span><span class="p">,</span> <span class="k">class</span> <span class="k">DESC</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h3 id="多表查询">多表查询</h3>
+
+<h4 id="无条件连接">无条件连接</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">,</span> <span class="n">ScoreTable</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">ctime</span> <span class="k">FROM</span> <span class="n">Subject</span> <span class="n">a</span><span class="p">,</span><span class="n">ScoreTable</span> <span class="n">b</span> <span class="k">WHERE</span> <span class="n">a</span><span class="p">.</span><span class="n">cno</span> <span class="o">=</span> <span class="n">b</span><span class="p">.</span><span class="n">cno</span> <span class="k">AND</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074004'</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="笛卡尔积">笛卡尔积</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">CROSS</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="theta连接">theta连接</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="k">Temp</span><span class="p">.</span><span class="o">*</span><span class="p">,</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">join</span> <span class="n">ScoreTable</span> <span class="k">ON</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">sno</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="k">ON</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">sno</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="k">ON</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">sno</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'计算机'</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span> <span class="k">ASC</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="n">a</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="n">b</span> <span class="k">ON</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">JOIN</span> <span class="n">Subject</span> <span class="k">c</span> <span class="k">ON</span> <span class="n">b</span><span class="p">.</span><span class="n">cno</span> <span class="o">=</span> <span class="k">c</span><span class="p">.</span><span class="n">cno</span> <span class="k">WHERE</span> <span class="n">b</span><span class="p">.</span><span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">80</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="自连接">自连接</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="n">a</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="n">b</span> <span class="k">ON</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="o">&lt;&gt;</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">WHERE</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074001'</span> <span class="k">AND</span> <span class="n">a</span><span class="p">.</span><span class="n">score</span> <span class="o">&gt;</span> <span class="n">b</span><span class="p">.</span><span class="n">score</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="n">a</span> <span class="k">JOIN</span> <span class="k">Temp</span> <span class="n">b</span> <span class="k">ON</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="o">&lt;&gt;</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">WHERE</span> <span class="n">a</span><span class="p">.</span><span class="n">sname</span> <span class="o">=</span> <span class="s1">'Tom'</span> <span class="k">AND</span> <span class="n">a</span><span class="p">.</span><span class="n">credit</span> <span class="o">&lt;</span> <span class="n">b</span><span class="p">.</span><span class="n">credit</span><span class="p">;</span>
+<span class="c1">-- 与以下语句结果相同：SELECT * FROM Temp a, Temp b WHERE a.sname = 'Tom' AND a.credit &lt; b.credit;</span>
+</code></pre></div></div>
+<h4 id="右连接">右连接</h4>
+
+<p>右(外)连接，右表的记录将会全部表示出来，而左表只会显示符合搜索条件的记录。左表记录不足的地方均为NULL。左(外)连接与之相反。</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="n">a</span> <span class="k">RIGHT</span> <span class="k">JOIN</span> <span class="k">Temp</span> <span class="n">b</span> <span class="k">ON</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">WHERE</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="k">is</span> <span class="k">NULL</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="自然连接">自然连接</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="k">USING</span><span class="p">(</span><span class="n">sno</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">NATURAL</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">NATURAL</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="k">NATURAL</span> <span class="k">JOIN</span> <span class="n">Subject</span><span class="p">;</span>
+<span class="c1">-- NATURAL 联接中使用的列不能有限定词</span>
+<span class="c1">-- 误：SELECT * FROM Temp a NATURAL JOIN ScoreTable b NATURAL JOIN Subject c WHERE a.sno = '189074001';</span>
+<span class="c1">-- 误：SELECT * FROM Temp a NATURAL JOIN ScoreTable b WHERE a.sno = '189074001';</span>
+<span class="c1">-- 正：SELECT * FROM Temp a JOIN ScoreTable b ON a.sno = b.sno JOIN Subject c ON b.cno = c.cno WHERE a.sno = '189074001';</span>
+</code></pre></div></div>
+<h3 id="子查询">子查询</h3>
+
+<h4 id="子查询放在where子句中">子查询放在WHERE子句中：</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">ctime</span> <span class="k">FROM</span> <span class="n">Subject</span> <span class="k">WHERE</span> <span class="n">Subject</span><span class="p">.</span><span class="n">cno</span> <span class="o">=</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">cno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074004'</span><span class="p">);</span><span class="c1">-- 逻辑清晰但速度慢</span>
+<span class="c1">-- 同：SELECT ctime FROM Subject a, ScoreTable b WHERE a.cno = b.cno AND b.sno = '189074004';</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="k">IN</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span>  <span class="o">=</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">cno</span> <span class="k">FROM</span> <span class="n">Subject</span> <span class="k">WHERE</span> <span class="n">cname</span> <span class="o">=</span> <span class="s1">'大学英语'</span><span class="p">));</span>
+<span class="c1">-- 同：SELECT * FROM Temp a, ScoreTable b, Subject c WHERE a.sno = b.sno AND b.cno = c.cno AND c.cname = '大学英语'; </span>
+<span class="c1">-- 同：SELECT * FROM Temp a JOIN ScoreTable b ON a.sno = b.sno JOIN Subject c ON b.cno = c.cno WHERE cname = '大学英语';</span>
+<span class="c1">-- 同：SELECT * FROM Temp WHERE sno IN (SELECT sno FROM ScoreTable WHERE cno IN (SELECT cno FROM Subject WHERE cname = '大学英语'));</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="p">(</span><span class="k">SELECT</span> <span class="k">MAX</span><span class="p">(</span><span class="n">score</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="k">ALL</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="p">(</span><span class="k">SELECT</span> <span class="k">MIN</span><span class="p">(</span><span class="n">score</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="k">ALL</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="k">ANY</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">);</span>
+<span class="c1">--  == </span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">score</span> <span class="o">&gt;</span> <span class="k">SOME</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">);</span>
+</code></pre></div></div>
+<h4 id="将子查询放在select中">将子查询放在SELECT中：</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="p">(</span><span class="k">SELECT</span> <span class="k">MAX</span><span class="p">(</span><span class="n">score</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">ScoreTable</span><span class="p">)</span><span class="n">MaxSocre</span> <span class="k">FROM</span> <span class="n">ScoreTable</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="将子查询放在from中">将子查询放在FROM中：</h4>
+
+<p>Oracle:</p>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">score</span> <span class="k">DESC</span><span class="p">)</span> <span class="k">WHERE</span> <span class="n">ROWNUM</span> <span class="o">&lt;=</span> <span class="mi">5</span><span class="p">;</span><span class="c1">-- 求成绩的前5名</span>
+<span class="c1">-- 误：SELECT * FROM ScoreTable WHERE ROWNUM &lt;= 5 ORDER BY score DESC;</span>
+</code></pre></div></div>
+<p>mysql:</p>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">--  mysql  Ver 8.0.21-0ubuntu0.20.04.4 for Linux on x86_64 ((Ubuntu))</span>
+<span class="c1">--  当前版本mysql中没有ROWNUM, 可以使用如下方法实现ROWNUM:</span>
+<span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">AS</span> <span class="n">ROWNUM</span><span class="p">,</span> <span class="n">sno</span><span class="p">,</span> <span class="n">score</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="mi">0</span><span class="p">)</span><span class="n">r</span><span class="p">,</span> <span class="n">ScoreTable</span><span class="p">;</span>
+<span class="c1">--  以@符号开头的变量是会话变量。直到会话结束前它可用和可访问。</span>
+<span class="c1">-- 因此该例的实现为：</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">AS</span> <span class="n">ROWNUM</span><span class="p">,</span> <span class="n">sno</span><span class="p">,</span> <span class="n">score</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="mi">0</span><span class="p">)</span><span class="n">r</span><span class="p">,</span> <span class="n">ScoreTable</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">score</span> <span class="k">DESC</span><span class="p">)</span><span class="n">sc</span> <span class="k">WHERE</span> <span class="n">ROWNUM</span> <span class="o">&lt;=</span> <span class="mi">5</span><span class="p">;</span><span class="c1">-- 求成绩的前5名</span>
+</code></pre></div></div>
+<h3 id="相关子查询">相关子查询</h3>
+
+<p>所有的子查询可以分为两类，即相关子查询和非相关子查询</p>
+
+<p>非相关子查询是独立于外部查询的子查询，子查询总共执行一次，执行完毕后将值传递给外部查询。
+相关子查询的执行依赖于外部查询的数据，外部查询执行一行，子查询就执行一次。执行查询的时候先取得外层查询的一个属性值，然后执行与此属性值相关的子查询，执行完毕后再取得外层父查询的下一个值，依次再来重复执行子查询；故非相关子查询比相关子查询效率高。</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">score</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="k">EXISTS</span><span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">sno</span> <span class="k">AND</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074001'</span><span class="p">);</span>
+<span class="c1">--  同：</span>
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">gender</span><span class="p">,</span> <span class="n">dept</span><span class="p">,</span> <span class="n">remarks</span><span class="p">,</span> <span class="n">sname</span><span class="p">,</span> <span class="n">credit</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">a</span><span class="p">.</span><span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="n">a</span> <span class="k">LEFT</span> <span class="k">JOIN</span> <span class="n">ScoreTable</span> <span class="n">b</span> <span class="k">ON</span> <span class="n">a</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">WHERE</span> <span class="n">b</span><span class="p">.</span><span class="n">sno</span> <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">)</span><span class="n">t</span><span class="p">;</span>
+<span class="err">​</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">Subject</span> <span class="k">WHERE</span> <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span> <span class="o">=</span> <span class="n">sno</span> <span class="k">AND</span> <span class="n">cno</span> <span class="o">=</span> <span class="n">Subject</span><span class="p">.</span><span class="n">cno</span><span class="p">));</span>
+</code></pre></div></div>
+
+<h3 id="传统集合运算">传统集合运算</h3>
+
+<h4 id="并运算">并运算</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">cno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span> <span class="k">UNION</span> <span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">cno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">;</span>
+<span class="c1">-- 同：SELECT sno, cno FROM ScoreTable WHERE cno IN ('0001', '0002');</span>
+<span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">UNION</span> <span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+</code></pre></div></div>
+<ul>
+  <li>UNION ALL 不去重</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="k">IN</span> <span class="p">(</span><span class="s1">'189074000'</span><span class="p">,</span> <span class="s1">'189074001'</span><span class="p">)</span> 
+<span class="k">UNION</span> <span class="k">ALL</span>
+<span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="k">IN</span> <span class="p">(</span><span class="s1">'189074000'</span><span class="p">,</span> <span class="s1">'189074002'</span><span class="p">);</span>
+</code></pre></div></div>
+<h4 id="交运算">交运算</h4>
+
+<ul>
+  <li>mysql只支持UNION运算，不支持INTERSECT运算</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span> <span class="k">INTERSECT</span> <span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">;</span>
+<span class="c1">-- 同：SELECT sno FROM ScoreTable WHERE cno = '0001' AND sno IN (SELECT sno FROM ScoreTable WHERE cno = '0002'); -- 在mysql中可以这样实现交运算</span>
+</code></pre></div></div>
+<h4 id="差运算">差运算</h4>
+
+<ul>
+  <li>mysql中不支持MINUS运算</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="n">MINUS</span> <span class="k">SELECT</span> <span class="n">sno</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0002'</span><span class="p">;</span>
+<span class="c1">-- ORACLE中用MINUS，SQL SERVER中用EXCEPT</span>
+</code></pre></div></div>
+<p>查询比计算机专业女生人数还少的专业及女生人数</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">dept</span><span class="p">,</span> <span class="n">girl</span> 
+<span class="k">FROM</span> 
+<span class="p">(</span>
+    <span class="k">SELECT</span> <span class="n">dept</span><span class="p">,</span> <span class="k">COUNT</span><span class="p">(</span><span class="k">CASE</span> <span class="k">WHEN</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span> <span class="k">THEN</span> <span class="s1">'1'</span> <span class="k">END</span><span class="p">)</span> <span class="n">girl</span> 
+    <span class="k">FROM</span> <span class="k">Temp</span> 
+    <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span> 
+<span class="p">)</span>
+<span class="k">WHERE</span> <span class="n">girl</span> <span class="o">&lt;</span> 
+<span class="p">(</span>
+       <span class="k">SELECT</span> <span class="n">girl</span> 
+       <span class="k">FROM</span> 
+       <span class="p">(</span>
+          <span class="k">SELECT</span> <span class="n">dept</span><span class="p">,</span> <span class="k">COUNT</span><span class="p">(</span><span class="k">CASE</span> <span class="k">WHEN</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span> <span class="k">THEN</span> <span class="s1">'1'</span> <span class="k">END</span><span class="p">)</span> <span class="n">girl</span> 
+          <span class="k">FROM</span> <span class="k">Temp</span> 
+          <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span> 
+       <span class="p">)</span>
+      <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'计算机'</span>
+                                        
+<span class="p">);</span>
+
+<span class="c1">--  以下代码不正确（当存在某专业女生人数为０时...）</span>
+<span class="k">SELECT</span> <span class="n">dept</span><span class="p">,</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span> <span class="k">HAVING</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="k">SELECT</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'计算机'</span> <span class="k">AND</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span><span class="p">);</span>
+
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">dept</span> 
+<span class="k">FROM</span> <span class="k">Temp</span> 
+<span class="n">MINUS</span> 
+<span class="p">(</span>
+    <span class="k">SELECT</span> <span class="n">dept</span> 
+    <span class="k">FROM</span> <span class="k">Temp</span> 
+    <span class="k">WHERE</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span> 
+    <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">dept</span> 
+    <span class="k">HAVING</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="p">(</span>
+        <span class="k">SELECT</span> <span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span>
+        <span class="k">FROM</span> <span class="k">Temp</span> 
+        <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'计算机'</span> <span class="k">AND</span> <span class="n">gender</span> <span class="o">=</span> <span class="s1">'女'</span>
+    <span class="p">)</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<h3 id="分页查询">分页查询</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">--  Oracle:</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="n">ROWNUM</span> <span class="n">rn</span><span class="p">,</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span><span class="p">,</span> <span class="n">dept</span><span class="p">,</span>  <span class="n">credit</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">ROWNUM</span> <span class="o">&lt;=</span> <span class="n">currentPage</span> <span class="o">*</span> <span class="n">pageSize</span><span class="p">)</span><span class="n">tmp</span> <span class="k">WHERE</span> <span class="n">rn</span> <span class="o">&gt;</span> <span class="p">(</span><span class="n">currentPage</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">pageSize</span><span class="p">;</span>
+<span class="err">​</span>
+<span class="c1">--  mysql:</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">AS</span> <span class="n">ROWNUM</span><span class="p">,</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span><span class="p">,</span> <span class="n">credit</span> <span class="k">FROM</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">@</span><span class="n">ROWNUM</span> <span class="p">:</span><span class="o">=</span> <span class="mi">0</span><span class="p">)</span><span class="n">r</span><span class="p">,</span> <span class="k">Temp</span><span class="p">)</span><span class="n">page</span> <span class="k">WHERE</span> <span class="n">ROWNUM</span> <span class="k">BETWEEN</span> <span class="p">((</span><span class="n">currentPage</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">pageSize</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">AND</span> <span class="p">(</span><span class="n">currentPage</span> <span class="o">*</span> <span class="n">pageSize</span><span class="p">);</span>
+</code></pre></div></div>
+<h3 id="索引">索引</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">INDEX</span> <span class="n">scoreT_score_idx</span> <span class="k">ON</span> <span class="n">ScoreTable</span><span class="p">(</span><span class="n">score</span><span class="p">);</span>
+<span class="c1">-- CREATE UNIQUE INDEX temp_sname_uniq_idx ON Temp(sname);</span>
+<span class="k">CREATE</span> <span class="k">INDEX</span> <span class="n">scoreT_idx</span> <span class="k">ON</span> <span class="n">ScoreTable</span><span class="p">(</span><span class="n">sno</span><span class="p">,</span> <span class="n">cno</span><span class="p">);</span><span class="c1">-- 复合索引</span>
+<span class="k">CREATE</span> <span class="k">INDEX</span> <span class="n">sub_cn_ct_idx</span> <span class="k">ON</span> <span class="n">Subject</span><span class="p">(</span><span class="n">cno</span> <span class="k">ASC</span><span class="p">,</span> <span class="n">ctime</span> <span class="k">DESC</span><span class="p">);</span><span class="c1">-- 指定索引值的排列顺序</span>
+</code></pre></div></div>
+<h3 id="视图">视图</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">VIEW</span> <span class="n">temp_CS_view</span>
+<span class="k">AS</span> 
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'计算机'</span><span class="p">;</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">VIEW</span> <span class="n">score_sno_avg_view</span><span class="err">（</span><span class="n">sno</span><span class="p">,</span> <span class="n">avg_score</span><span class="err">）</span><span class="c1">-- 要使用别名</span>
+<span class="k">AS</span>
+<span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="k">AVG</span><span class="p">(</span><span class="n">score</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">sno</span><span class="p">;</span>
+</code></pre></div></div>
+<h4 id="使用视图">使用视图</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">score_sno_avg_view</span> <span class="k">WHERE</span> <span class="n">avg_score</span> <span class="o">&gt;</span> <span class="mi">85</span><span class="p">;</span>
+<span class="c1">-- UPDATE score_sno_avg_view SET sno = 100 WHERE avg_score = 88;-- 此视图的数据操纵操作非法</span>
+<span class="k">UPDATE</span> <span class="n">temp_CS_view</span> <span class="k">SET</span> <span class="n">sname</span> <span class="o">=</span> <span class="s1">'Amilia'</span> <span class="k">WHERE</span> <span class="n">sname</span> <span class="o">=</span> <span class="s1">'Amy'</span><span class="p">;</span><span class="c1">-- 1行已更新。</span>
+</code></pre></div></div>
+<h4 id="删除视图">删除视图</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">DROP</span> <span class="k">view</span> <span class="n">temp_CS_view</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="同义词">同义词</h3>
+
+<ul>
+  <li>mysql中没有synonym</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">PUBLIC</span> <span class="n">SYNONYM</span> <span class="n">score_s_a</span> <span class="k">FOR</span> <span class="n">score_sno_avg_view</span><span class="p">;</span><span class="c1">-- 公有同义词</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="n">SYNONYM</span> <span class="n">score_sa</span> <span class="k">FOR</span> <span class="n">score_sno_avg_view</span><span class="p">;</span><span class="c1">-- 私有同义词</span>
+</code></pre></div></div>
+<h3 id="序列">序列</h3>
+
+<ul>
+  <li>mysql中无SEQUENCE</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="n">SEQUENCE</span> <span class="n">id_seq</span>
+<span class="k">START</span> <span class="k">WITH</span> <span class="mi">189074012</span>
+<span class="k">INCREMENT</span> <span class="k">BY</span> <span class="mi">1</span>
+<span class="k">MAXVALUE</span> <span class="mi">189074999</span>
+<span class="k">CACHE</span> <span class="mi">50</span><span class="p">;</span>
+
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="k">Temp</span> <span class="k">VALUES</span><span class="p">(</span><span class="n">id_seq</span><span class="p">.</span><span class="n">NEXTVAL</span><span class="p">,</span> <span class="s1">'Larry'</span><span class="p">,</span> <span class="s1">'男'</span><span class="p">,</span> <span class="s1">'计算机'</span><span class="p">,</span> <span class="s1">'三无学生'</span><span class="p">,</span> <span class="s1">'10'</span><span class="p">,</span> <span class="s1">'1'</span><span class="p">);</span><span class="c1">-- 189074012</span>
+<span class="k">SELECT</span> <span class="n">id_seq</span><span class="p">.</span><span class="n">CURRVAL</span> <span class="k">FROM</span> <span class="n">DUAL</span><span class="p">;</span>
+<span class="k">SELECT</span> <span class="n">id_seq</span><span class="p">.</span><span class="n">NEXTVAL</span> <span class="k">FROM</span> <span class="n">DUAL</span><span class="p">;</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="k">Temp</span> <span class="k">VALUES</span><span class="p">(</span><span class="n">id_seq</span><span class="p">.</span><span class="n">NEXTVAL</span><span class="p">,</span> <span class="s1">'Harry'</span><span class="p">,</span> <span class="s1">'男'</span><span class="p">,</span> <span class="s1">'计算机'</span><span class="p">,</span> <span class="s1">'三沙学生'</span><span class="p">,</span> <span class="s1">'15'</span><span class="p">,</span> <span class="s1">'1'</span><span class="p">);</span><span class="c1">-- 189074014</span>
+</code></pre></div></div>
+<h4 id="删除序列">删除序列</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">DROP</span> <span class="n">SEQUENCE</span> <span class="n">id_seq</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="pl-sql编程">PL-SQL编程</h3>
+
+<ul>
+  <li>MySQL不支持anonymous code block</li>
+</ul>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+  <span class="n">stuno</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">;</span>
+  <span class="n">stuname</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sname</span><span class="o">%</span><span class="k">TYPE</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span> <span class="n">sname</span> <span class="k">INTO</span> <span class="n">stuno</span><span class="p">,</span> <span class="n">stuname</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074005'</span><span class="p">;</span>
+  <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stuno</span><span class="o">||</span><span class="n">stuname</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+  <span class="n">stu</span> <span class="k">Temp</span><span class="o">%</span><span class="n">ROWTYPE</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="k">SELECT</span> <span class="o">*</span>  <span class="k">INTO</span> <span class="n">stu</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074005'</span><span class="p">;</span>
+  <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sno</span><span class="o">||</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="o">||</span><span class="n">stu</span><span class="p">.</span><span class="n">dept</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">set</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+    <span class="n">n</span> <span class="n">number</span><span class="p">;</span>
+    <span class="k">result</span> <span class="n">number</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+    <span class="n">n</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>   <span class="k">result</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">while</span> <span class="n">n</span><span class="o">&lt;=</span><span class="mi">100</span> <span class="n">loop</span>
+        <span class="k">result</span><span class="p">:</span><span class="o">=</span><span class="k">result</span><span class="o">+</span><span class="n">n</span><span class="p">;</span>
+        <span class="n">n</span><span class="p">:</span><span class="o">=</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+    <span class="k">end</span> <span class="n">loop</span><span class="p">;</span>
+    <span class="n">dbms_output</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'结果是'</span><span class="o">||</span><span class="k">result</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+</code></pre></div></div>
+<h3 id="procedure-存储过程">PROCEDURE 存储过程</h3>
+
+<h4 id="创建存储过程oracle">创建存储过程(Oracle)</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">PROCEDURE</span> <span class="n">sp_calcsum1</span>
+<span class="k">as</span>
+    <span class="n">n</span> <span class="n">number</span><span class="p">;</span>   <span class="k">result</span> <span class="n">number</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+    <span class="n">n</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>   <span class="k">result</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">while</span> <span class="n">n</span><span class="o">&lt;=</span><span class="mi">100</span> <span class="n">loop</span>
+        <span class="k">result</span><span class="p">:</span><span class="o">=</span><span class="k">result</span><span class="o">+</span><span class="n">n</span><span class="p">;</span>
+        <span class="n">n</span><span class="p">:</span><span class="o">=</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+    <span class="k">end</span> <span class="n">loop</span><span class="p">;</span>
+    <span class="n">dbms_output</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'结果是'</span><span class="o">||</span><span class="k">result</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="cm">/*
+   在view（视图）中，只能使用as；
+   在corsor（游标）中，只能使用is；
+   对于procedure（存储过程）, function（函数）, package（程序包）来说，as和is没有区别。
+*/</span>
+</code></pre></div></div>
+<h4 id="执行存储过程oracle">执行存储过程(Oracle)</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">execute</span> <span class="n">sp_calcsum1</span><span class="p">;</span>
+
+<span class="k">BEGIN</span> 
+<span class="n">sp_calcsum1</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">PROCEDURE</span> <span class="n">del_sc</span><span class="p">(</span><span class="n">stuNo</span> <span class="k">IN</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">,</span> <span class="n">crsNo</span> <span class="k">IN</span> <span class="n">Subject</span><span class="p">.</span><span class="n">cno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">)</span>
+<span class="k">IS</span> <span class="cm">/*不能加DECLARE*/</span>
+<span class="k">BEGIN</span> 
+    <span class="k">DELETE</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="n">stuNo</span> <span class="k">AND</span> <span class="n">cno</span> <span class="o">=</span> <span class="n">crsNo</span><span class="p">;</span>
+<span class="n">EXCEPTION</span> 
+    <span class="k">WHEN</span> <span class="n">NO_DATA_FOUND</span> <span class="k">THEN</span> 
+        <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'没找到数据！'</span><span class="p">);</span>
+    <span class="k">WHEN</span> <span class="n">OTHERS</span> <span class="k">THEN</span>
+        <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'产生异常！'</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>        
+<span class="o">/</span>
+<span class="k">EXECUTE</span> <span class="n">del_sc</span><span class="p">(</span><span class="s1">'189074000'</span><span class="p">,</span> <span class="s1">'0008'</span><span class="p">);</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">ScoreTable</span><span class="p">;</span>
+<span class="err">​</span>
+<span class="o">/</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">PROCEDURE</span> <span class="n">sel_score</span><span class="p">(</span><span class="n">stuNo</span> <span class="k">IN</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">,</span> <span class="n">crsNo</span> <span class="k">IN</span> <span class="n">Subject</span><span class="p">.</span><span class="n">cno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">,</span> <span class="n">sco</span> <span class="k">OUT</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">score</span><span class="o">%</span><span class="k">TYPE</span><span class="p">)</span>
+<span class="k">IS</span>
+<span class="k">BEGIN</span>
+    <span class="k">SELECT</span> <span class="n">score</span> <span class="k">INTO</span> <span class="n">sco</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">stuNo</span> <span class="o">=</span> <span class="n">sno</span> <span class="k">AND</span> <span class="n">crsNo</span> <span class="o">=</span> <span class="n">cno</span><span class="p">;</span>
+<span class="n">EXCEPTION</span> 
+    <span class="k">WHEN</span> <span class="n">NO_DATA_FOUND</span> <span class="k">THEN</span> 
+        <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'没找到数据！'</span><span class="p">);</span>
+    <span class="k">WHEN</span> <span class="n">OTHERS</span> <span class="k">THEN</span>
+        <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'产生异常！'</span><span class="p">);</span> 
+<span class="k">END</span><span class="p">;</span>    
+<span class="o">/</span>
+<span class="err">​</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+  <span class="n">score</span> <span class="n">ScoreTable</span><span class="p">.</span><span class="n">score</span><span class="o">%</span><span class="k">TYPE</span><span class="p">;</span>
+<span class="k">BEGIN</span> 
+  <span class="n">sel_score</span><span class="p">(</span><span class="s1">'189074000'</span><span class="p">,</span> <span class="s1">'0008'</span><span class="p">,</span> <span class="n">score</span><span class="p">);</span><span class="cm">/*不需要EXECUTE*/</span>
+  <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">score</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+</code></pre></div></div>
+
+<h4 id="创建存储过程mysql">创建存储过程（Mysql)</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">DELIMITER</span> <span class="err">$$</span>
+<span class="err">​</span>
+<span class="k">CREATE</span> <span class="k">PROCEDURE</span> <span class="n">calcsum</span><span class="p">(</span><span class="k">OUT</span> <span class="k">sum</span> <span class="nb">INT</span><span class="p">)</span>
+<span class="k">BEGIN</span> 
+   <span class="k">DECLARE</span> <span class="n">n</span> <span class="nb">INT</span><span class="p">;</span>
+   <span class="k">SET</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+   <span class="k">SET</span> <span class="k">sum</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+   <span class="n">WHILE</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">100</span> <span class="k">do</span>
+      <span class="k">SET</span> <span class="k">sum</span> <span class="o">=</span> <span class="k">sum</span> <span class="o">+</span> <span class="n">n</span><span class="p">;</span>
+      <span class="k">SET</span> <span class="n">n</span> <span class="o">=</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+   <span class="k">END</span> <span class="n">WHILE</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="err">$$</span>
+</code></pre></div></div>
+<h4 id="执行存储过程mysql">执行存储过程（Mysql)</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">DELIMITER</span> <span class="p">;</span>
+<span class="k">SET</span> <span class="o">@</span><span class="k">sum</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="k">CALL</span> <span class="n">calcsum</span><span class="p">(</span><span class="o">@</span><span class="k">sum</span><span class="p">);</span>
+ 
+
+<span class="k">FUNCTION</span>
+
+
+<span class="o">/</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">FUNCTION</span> <span class="n">f_calcsum</span><span class="p">(</span><span class="n">n</span> <span class="n">number</span><span class="p">)</span> <span class="k">return</span> <span class="nb">int</span>
+<span class="k">as</span>
+    <span class="n">i</span> <span class="n">number</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="k">result</span> <span class="n">number</span><span class="p">:</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+    <span class="n">while</span> <span class="n">i</span><span class="o">&lt;=</span><span class="n">n</span> <span class="n">loop</span>
+        <span class="k">result</span><span class="p">:</span><span class="o">=</span><span class="k">result</span><span class="o">+</span><span class="n">n</span><span class="p">;</span>
+        <span class="n">i</span><span class="p">:</span><span class="o">=</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">;</span>
+    <span class="k">end</span> <span class="n">loop</span><span class="p">;</span>
+    <span class="k">return</span> <span class="k">result</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">DECLARE</span>
+  <span class="k">result</span> <span class="nb">int</span><span class="p">:</span><span class="o">=</span><span class="n">f_calcsum</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="k">BEGIN</span>
+  <span class="n">dbms_output</span><span class="p">.</span><span class="n">put_line</span><span class="p">(</span><span class="s1">'结果是'</span><span class="o">||</span><span class="k">result</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+</code></pre></div></div>
+<h3 id="游标">游标</h3>
+
+<h4 id="利用游标变量循环">利用游标变量循环</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+  <span class="n">stu</span> <span class="k">Temp</span><span class="o">%</span><span class="n">ROWTYPE</span><span class="p">;</span>
+  <span class="k">CURSOR</span> <span class="n">cur_tmp</span> <span class="k">IS</span> <span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="k">OPEN</span> <span class="n">cur_tmp</span><span class="p">;</span>
+  <span class="n">LOOP</span>                  
+    <span class="k">FETCH</span> <span class="n">cur_tmp</span> <span class="k">INTO</span> <span class="n">stu</span><span class="p">;</span>
+    <span class="n">EXIT</span> <span class="k">WHEN</span> <span class="n">cur_tmp</span><span class="o">%</span><span class="n">NOTFOUND</span><span class="p">;</span>
+    <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sno</span><span class="o">||</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="p">);</span>
+  <span class="k">END</span> <span class="n">LOOP</span><span class="p">;</span>
+<span class="k">CLOSE</span> <span class="n">cur_tmp</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>   
+</code></pre></div></div>
+<h4 id="for循环">FOR循环</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">DECLARE</span>
+  <span class="k">CURSOR</span> <span class="n">cur_tmp</span> <span class="k">IS</span> <span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+<span class="c1">-- 无需手动打开关闭游标</span>
+  <span class="k">FOR</span> <span class="n">stu</span> <span class="k">IN</span> <span class="n">cur_tmp</span> <span class="n">LOOP</span>
+  <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sno</span><span class="o">||</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="p">);</span>
+  <span class="k">END</span> <span class="n">LOOP</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="err">​</span>
+<span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="k">FOR</span> <span class="n">stu</span> <span class="k">IN</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">)</span> <span class="n">LOOP</span>
+  <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sno</span><span class="o">||</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="p">);</span>
+  <span class="k">END</span> <span class="n">LOOP</span><span class="p">;</span> 
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">BEGIN</span> 
+    <span class="k">FOR</span> <span class="n">stu</span> <span class="k">IN</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">)</span> <span class="n">LOOP</span>
+        <span class="n">IF</span> <span class="n">stu</span><span class="p">.</span><span class="n">sname</span>  <span class="k">LIKE</span> <span class="s1">'%J%'</span> <span class="k">THEN</span>
+            <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="p">);</span>
+        <span class="k">END</span> <span class="n">IF</span><span class="p">;</span>
+    <span class="k">END</span> <span class="n">LOOP</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>    
+<span class="o">/</span>
+<span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">PROCEDURE</span> <span class="n">find_name</span><span class="p">(</span><span class="n">name</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sname</span><span class="o">%</span><span class="k">TYPE</span><span class="p">)</span>
+<span class="k">AS</span>
+<span class="k">BEGIN</span>
+    <span class="k">FOR</span> <span class="n">stu</span> <span class="k">IN</span> <span class="p">(</span><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">Temp</span><span class="p">)</span> <span class="n">LOOP</span>
+        <span class="n">IF</span> <span class="n">stu</span><span class="p">.</span><span class="n">sname</span> <span class="k">LIKE</span> <span class="s1">'%'</span><span class="o">||</span><span class="n">name</span><span class="o">||</span><span class="s1">'%'</span> <span class="k">THEN</span> 
+            <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stu</span><span class="p">.</span><span class="n">sname</span><span class="p">);</span>
+        <span class="k">END</span> <span class="n">IF</span><span class="p">;</span>
+    <span class="k">END</span> <span class="n">LOOP</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>    
+<span class="o">/</span>
+<span class="k">EXECUTE</span> <span class="n">find_name</span><span class="p">(</span><span class="s1">'J'</span><span class="p">);</span>
+<span class="o">/</span>
+</code></pre></div></div>
+<h4 id="隐式游标">隐式游标</h4>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SET</span> <span class="n">SERVEROUTPUT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">credit</span> <span class="o">=</span> <span class="n">credit</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">WHERE</span> <span class="n">credit</span> <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">;</span>
+  <span class="n">IF</span> <span class="k">SQL</span><span class="o">%</span><span class="n">NOTFOUND</span> <span class="k">THEN</span>   
+    <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'没有记录被更改！'</span><span class="p">);</span>
+  <span class="k">ELSE</span>
+    <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'更改了'</span><span class="o">||</span><span class="k">SQL</span><span class="o">%</span><span class="n">ROWCOUNT</span><span class="o">||</span><span class="s1">'条记录。'</span><span class="p">);</span>
+  <span class="k">END</span> <span class="n">IF</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+</code></pre></div></div>
+<h3 id="异常处理">异常处理</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">/</span>
+<span class="k">DECLARE</span>
+    <span class="n">stuno</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sno</span><span class="o">%</span><span class="k">TYPE</span><span class="p">;</span>
+    <span class="n">stuname</span> <span class="k">Temp</span><span class="p">.</span><span class="n">sname</span><span class="o">%</span><span class="k">TYPE</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+    <span class="k">SELECT</span> <span class="n">sno</span><span class="p">,</span><span class="n">sname</span> <span class="k">INTO</span> <span class="n">stuno</span><span class="p">,</span><span class="n">stuname</span> <span class="k">FROM</span>  <span class="k">Temp</span> <span class="p">;</span>
+    <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="n">stuno</span><span class="o">||</span><span class="n">stuname</span><span class="p">);</span>
+<span class="n">EXCEPTION</span>
+    <span class="k">WHEN</span> <span class="n">no_data_found</span> <span class="k">THEN</span>
+      <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'数据没找到'</span><span class="p">);</span>
+    <span class="k">WHEN</span> <span class="n">too_many_rows</span> <span class="k">THEN</span>
+      <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'结果集超过一行'</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="k">DECLARE</span>
+    <span class="n">null_exp</span> <span class="n">EXCEPTION</span><span class="p">;</span>
+    <span class="n">stucj</span> <span class="n">Subject</span><span class="o">%</span><span class="n">ROWTYPE</span><span class="p">;</span>
+<span class="k">BEGIN</span>
+  <span class="n">stucj</span><span class="p">.</span><span class="n">cname</span><span class="p">:</span><span class="o">=</span><span class="s1">'001241'</span><span class="p">;</span> <span class="n">stucj</span><span class="p">.</span><span class="n">cno</span><span class="p">:</span><span class="o">=</span><span class="s1">'206'</span><span class="p">;</span>
+  <span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">Subject</span> <span class="k">VALUES</span><span class="p">(</span><span class="n">stucj</span><span class="p">.</span><span class="n">cno</span><span class="p">,</span><span class="n">stucj</span><span class="p">.</span><span class="n">cname</span><span class="p">,</span><span class="n">stucj</span><span class="p">.</span><span class="n">ctime</span><span class="p">);</span>
+  <span class="n">IF</span> <span class="n">stucj</span><span class="p">.</span><span class="n">ctime</span> <span class="k">IS</span> <span class="k">NULL</span> <span class="k">THEN</span>   
+   <span class="n">RAISE</span> <span class="n">null_exp</span><span class="p">;</span>   
+  <span class="k">END</span> <span class="n">IF</span><span class="p">;</span>
+<span class="n">EXCEPTION</span>
+    <span class="k">WHEN</span> <span class="n">null_exp</span> <span class="k">THEN</span>
+      <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'成绩不能为空值'</span><span class="p">);</span>
+      <span class="k">ROLLBACK</span><span class="p">;</span>
+    <span class="k">WHEN</span> <span class="n">others</span> <span class="k">THEN</span>
+      <span class="n">DBMS_OUTPUT</span><span class="p">.</span><span class="n">PUT_LINE</span><span class="p">(</span><span class="s1">'其他异常'</span><span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+</code></pre></div></div>
+<h3 id="触发器">触发器</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">ScoreT_log</span>
+<span class="p">(</span>
+    <span class="n">operate_type</span> <span class="n">varchar2</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span>   
+    <span class="n">operate_date</span> <span class="nb">date</span><span class="p">,</span>
+    <span class="n">operate_user</span> <span class="n">varchar2</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+ <span class="p">);</span>
+<span class="o">/</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">TRIGGER</span> <span class="n">tri_ScoreT</span> <span class="k">BEFORE</span> <span class="k">INSERT</span> <span class="k">OR</span> <span class="k">DELETE</span> <span class="k">OR</span> <span class="k">UPDATE</span> <span class="k">ON</span> <span class="n">ScoreTable</span>
+<span class="k">DECLARE</span> 
+    <span class="n">operate_type</span> <span class="n">varchar2</span><span class="p">(</span><span class="mi">20</span><span class="p">);</span>
+<span class="k">BEGIN</span>
+    <span class="n">IF</span> <span class="n">INSERTING</span> <span class="k">THEN</span> 
+        <span class="n">operate_type</span> <span class="p">:</span><span class="o">=</span> <span class="s1">'INSERT'</span><span class="p">;</span>
+    <span class="n">ELSIF</span> <span class="n">DELETING</span> <span class="k">THEN</span> 
+        <span class="n">operate_type</span> <span class="p">:</span><span class="o">=</span> <span class="s1">'DELETE'</span><span class="p">;</span>
+    <span class="k">ELSE</span>
+        <span class="n">operate_type</span> <span class="p">:</span><span class="o">=</span> <span class="s1">'UPDATE'</span><span class="p">;</span>
+    <span class="k">END</span> <span class="n">IF</span><span class="p">;</span>
+    <span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">ScoreT_log</span> <span class="k">VALUES</span><span class="p">(</span><span class="n">operate_type</span><span class="p">,</span> <span class="n">sysdate</span><span class="p">,</span> <span class="n">ora_login_user</span> <span class="p">);</span>
+<span class="k">END</span><span class="p">;</span>    
+<span class="o">/</span>
+<span class="k">UPDATE</span> <span class="n">ScoreTable</span> <span class="k">SET</span> <span class="n">score</span> <span class="o">=</span> <span class="mi">75</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074000'</span> <span class="k">AND</span> <span class="n">cno</span> <span class="o">=</span> <span class="s1">'0001'</span><span class="p">;</span>
+<span class="c1">-- SELECT * FROM ScoreT_log;</span>
+<span class="o">/</span>
+<span class="k">CREATE</span> <span class="k">OR</span> <span class="k">REPLACE</span> <span class="k">TRIGGER</span> <span class="n">tri_del_tmp</span> <span class="k">AFTER</span> <span class="k">DELETE</span> <span class="k">ON</span> <span class="k">Temp</span>
+<span class="k">FOR</span> <span class="k">EACH</span> <span class="k">ROW</span> 
+<span class="k">BEGIN</span>
+    <span class="k">DELETE</span> <span class="k">FROM</span> <span class="n">ScoreTable</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="p">:</span><span class="k">old</span><span class="p">.</span><span class="n">sno</span><span class="p">;</span>
+<span class="k">END</span><span class="p">;</span>
+<span class="o">/</span>
+<span class="err">​</span>
+<span class="k">DELETE</span> <span class="k">FROM</span> <span class="k">Temp</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074011'</span><span class="p">;</span>
+<span class="c1">-- SELECT * FROM ScoreTable;</span>
+<span class="c1">-- SELECT * FROM ScoreT_log;</span>
+</code></pre></div></div>
+<h3 id="事务提交与回退">事务提交与回退</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SHOW</span> <span class="n">AUTOCOMMIT</span><span class="p">;</span>
+<span class="k">SET</span> <span class="n">AUTOCOMMIT</span> <span class="k">ON</span><span class="p">;</span>
+<span class="k">SET</span> <span class="n">AUTOCOMMIT</span> <span class="k">OFF</span><span class="p">;</span>
+<span class="c1">-- 某些SQL语句（DDL语句, DCL语句, ），在它们被执行时会生成隐含的COMMIT命令，将会马上导致事务提交。</span>
+<span class="err">​</span>
+<span class="c1">-- 只撤销一部分事务  </span>
+<span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">remarks</span> <span class="o">=</span> <span class="s1">'三坏学生'</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074005'</span><span class="p">;</span> 
+<span class="n">SAVEPOINT</span> <span class="n">t</span><span class="p">;</span>
+<span class="k">UPDATE</span> <span class="k">Temp</span> <span class="k">SET</span> <span class="n">remarks</span> <span class="o">=</span> <span class="s1">'三坏学生'</span><span class="p">,</span> <span class="n">dept</span> <span class="o">=</span> <span class="s1">'软件工程'</span> <span class="k">WHERE</span> <span class="n">sno</span> <span class="o">=</span> <span class="s1">'189074006'</span><span class="p">;</span> 
+<span class="k">ROLLBACK</span> <span class="k">TO</span> <span class="n">t</span><span class="p">;</span>
+</code></pre></div></div>
+<h3 id="jdbc">JDBC</h3>
+
+<h4 id="jdbc-execute">JDBC execute</h4>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="nn">priv.Matrix.mine</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kn">import</span> <span class="nn">java.sql.Connection</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.DriverManager</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.ResultSet</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.SQLException</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.Statement</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Execute</span> 
+<span class="o">{</span>
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="nc">String</span><span class="o">[]</span> <span class="n">args</span><span class="o">)</span>
+    <span class="o">{</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">conStr</span> <span class="o">=</span> <span class="s">"jdbc:oracle:thin:@localhost:1521:xe"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">username</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">password</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="nc">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="nc">ResultSet</span> <span class="n">rs</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">sql</span> <span class="o">=</span> <span class="s">"CREATE TABLE tmp"</span>
+            <span class="o">+</span> <span class="s">"("</span>
+            <span class="o">+</span> <span class="s">"     id varchar2(20),"</span>
+            <span class="o">+</span> <span class="s">"     info varchar2(30)"</span>
+            <span class="o">+</span> <span class="s">")"</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="nc">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"oracle.jdbc.driver.OracleDriver"</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">ClassNotFoundException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="nc">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">conStr</span><span class="o">,</span> <span class="n">username</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+            <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+            <span class="kt">boolean</span> <span class="n">isResultSet</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="n">sql</span><span class="o">);</span>
+            <span class="kt">int</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+            <span class="kt">int</span> <span class="n">rowAffected</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+            <span class="k">while</span><span class="o">(</span><span class="kc">true</span><span class="o">)</span>
+            <span class="o">{</span>
+                <span class="k">if</span><span class="o">(</span><span class="n">isResultSet</span><span class="o">)</span>
+                <span class="o">{</span>
+                    <span class="n">count</span><span class="o">++;</span>
+                    <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"ResultSet:"</span> <span class="o">+</span> <span class="n">count</span><span class="o">);</span>
+                    <span class="n">rs</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">getResultSet</span><span class="o">();</span>
+                    <span class="k">while</span><span class="o">(</span><span class="n">rs</span><span class="o">.</span><span class="na">next</span><span class="o">())</span>
+                    <span class="o">{</span>
+                        <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="n">rs</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">+</span> <span class="s">"\t"</span> <span class="o">+</span> <span class="n">rs</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">"info"</span><span class="o">));</span>
+                    <span class="o">}</span>
+<span class="err">​</span>
+                <span class="o">}</span>
+                <span class="k">else</span>
+                <span class="o">{</span>
+                    <span class="n">rowAffected</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">getUpdateCount</span><span class="o">();</span>
+                    <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"row affected:"</span> <span class="o">+</span> <span class="n">rowAffected</span><span class="o">);</span>
+                    <span class="k">if</span><span class="o">(</span><span class="n">rowAffected</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="o">)</span>
+                    <span class="o">{</span>
+                        <span class="k">break</span><span class="o">;</span>
+                    <span class="o">}</span>
+<span class="err">​</span>
+                <span class="o">}</span>
+                <span class="n">stmt</span><span class="o">.</span><span class="na">getMoreResults</span><span class="o">();</span>
+            <span class="o">}</span>
+<span class="err">​</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">SQLException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+    <span class="o">}</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h4 id="jdbc-executebatch">JDBC executeBatch</h4>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="nn">priv.Matrix.mine</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kn">import</span> <span class="nn">java.sql.Connection</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.DriverManager</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.SQLException</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.Statement</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Execute</span> 
+<span class="o">{</span>
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="nc">String</span><span class="o">[]</span> <span class="n">args</span><span class="o">)</span>
+    <span class="o">{</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">conStr</span> <span class="o">=</span> <span class="s">"jdbc:oracle:thin:@localhost:1521:xe"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">username</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">password</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="nc">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">createTab</span> <span class="o">=</span> <span class="o">(</span><span class="s">"CREATE TABLE tmp"</span>
+                <span class="o">+</span> <span class="s">"("</span>
+                <span class="o">+</span> <span class="s">"     id varchar2(20),"</span>
+                <span class="o">+</span> <span class="s">"     info varchar2(30)"</span>
+                <span class="o">+</span> <span class="s">")"</span><span class="o">);</span>
+<span class="err">​</span>
+        <span class="kt">int</span><span class="o">[]</span> <span class="n">rowAffected</span> <span class="o">=</span> <span class="k">new</span> <span class="kt">int</span><span class="o">[</span><span class="mi">3</span><span class="o">];</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="nc">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"oracle.jdbc.driver.OracleDriver"</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">ClassNotFoundException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="nc">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">conStr</span><span class="o">,</span> <span class="n">username</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+            <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+<span class="err">​</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">(</span><span class="n">createTab</span><span class="o">);</span>
+<span class="err">​</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">addBatch</span><span class="o">(</span><span class="s">"INSERT INTO tmp VALUES('10001', 'first_info')"</span><span class="o">);</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">addBatch</span><span class="o">(</span><span class="s">"UPDATE tmp SET info = 'second_info' WHERE id = '10001'"</span><span class="o">);</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">addBatch</span><span class="o">(</span><span class="s">"DELETE FROM tmp WHERE id = '10001'"</span><span class="o">);</span>
+<span class="err">​</span>
+            <span class="n">rowAffected</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="na">executeBatch</span><span class="o">();</span>
+<span class="err">​</span>
+            <span class="k">for</span><span class="o">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="o">;</span> <span class="n">i</span><span class="o">++)</span>
+            <span class="o">{</span>
+                <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="s">"row affected:"</span> <span class="o">+</span> <span class="n">rowAffected</span><span class="o">[</span><span class="n">i</span><span class="o">]);</span>
+            <span class="o">}</span>
+<span class="err">​</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">SQLException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+    <span class="o">}</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h4 id="jdbc-preparedstatement">JDBC PreparedStatement</h4>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="nn">priv.Matrix.mine</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kn">import</span> <span class="nn">java.sql.Connection</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.DriverManager</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.PreparedStatement</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.ResultSet</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.SQLException</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.sql.Statement</span><span class="o">;</span>
+<span class="err">​</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">Execute</span> 
+<span class="o">{</span>
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="nc">String</span><span class="o">[]</span> <span class="n">args</span><span class="o">)</span>
+    <span class="o">{</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">conStr</span> <span class="o">=</span> <span class="s">"jdbc:oracle:thin:@localhost:1521:xe"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">username</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+        <span class="nc">String</span> <span class="n">password</span> <span class="o">=</span> <span class="s">"user1"</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">Connection</span> <span class="n">con</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="nc">Statement</span> <span class="n">stmt</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="nc">ResultSet</span> <span class="n">rs</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+<span class="err">​</span>
+        <span class="nc">String</span> <span class="n">createTab</span> <span class="o">=</span> <span class="o">(</span><span class="s">"CREATE TABLE tmp"</span>
+                <span class="o">+</span> <span class="s">"("</span>
+                <span class="o">+</span> <span class="s">"     id varchar2(20),"</span>
+                <span class="o">+</span> <span class="s">"     info varchar2(30)"</span>
+                <span class="o">+</span> <span class="s">")"</span><span class="o">);</span>
+<span class="err">​</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="nc">Class</span><span class="o">.</span><span class="na">forName</span><span class="o">(</span><span class="s">"oracle.jdbc.driver.OracleDriver"</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">ClassNotFoundException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+        <span class="k">try</span>
+        <span class="o">{</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="nc">DriverManager</span><span class="o">.</span><span class="na">getConnection</span><span class="o">(</span><span class="n">conStr</span><span class="o">,</span> <span class="n">username</span><span class="o">,</span> <span class="n">password</span><span class="o">);</span>
+<span class="err">​</span>
+            <span class="n">stmt</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">createStatement</span><span class="o">();</span>
+            <span class="n">stmt</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">(</span><span class="n">createTab</span><span class="o">);</span>
+<span class="err">​</span>
+            <span class="nc">PreparedStatement</span> <span class="n">pstmtInsert</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="s">"INSERT INTO tmp VALUES(?, ?)"</span><span class="o">);</span>
+            <span class="nc">PreparedStatement</span> <span class="n">pstmtSelect</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="s">"SELECT * FROM tmp WHERE id = ?"</span><span class="o">);</span>
+            <span class="nc">PreparedStatement</span> <span class="n">pstmtUpdate</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="s">"UPDATE tmp SET info = ? WHERE id = ?"</span><span class="o">);</span>
+            <span class="nc">PreparedStatement</span> <span class="n">pstmtDelete</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="na">prepareStatement</span><span class="o">(</span><span class="s">"DELETE FROM tmp WHERE id = ?"</span><span class="o">);</span>
+<span class="err">​</span>
+           <span class="o">--</span> <span class="n">该字符串不需要加单引号</span><span class="o">(</span><span class="err">'</span><span class="o">)</span><span class="err">，</span><span class="n">即</span><span class="s">"INSERT INTO tmp VALUES('?', '?')"</span><span class="n">是错的</span>  
+            <span class="n">pstmtInsert</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="s">"10001"</span><span class="o">);</span>
+            <span class="n">pstmtInsert</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">2</span><span class="o">,</span> <span class="s">"first info"</span><span class="o">);</span>
+            <span class="n">pstmtInsert</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+<span class="err">​</span>
+            <span class="n">pstmtSelect</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="s">"10001"</span><span class="o">);</span>
+            <span class="n">rs</span> <span class="o">=</span> <span class="n">pstmtSelect</span><span class="o">.</span><span class="na">executeQuery</span><span class="o">();</span>
+            <span class="k">while</span><span class="o">(</span><span class="n">rs</span><span class="o">.</span><span class="na">next</span><span class="o">())</span>
+            <span class="o">{</span>
+                <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="n">rs</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">+</span> <span class="s">"\t"</span> <span class="o">+</span> <span class="n">rs</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">"info"</span><span class="o">));</span>
+            <span class="o">}</span>
+<span class="err">​</span>
+<span class="err">​</span>
+            <span class="n">pstmtUpdate</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="s">"second info"</span><span class="o">);</span>
+            <span class="n">pstmtUpdate</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">2</span><span class="o">,</span> <span class="s">"10001"</span><span class="o">);</span>
+            <span class="n">pstmtUpdate</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+<span class="err">​</span>
+            <span class="n">pstmtDelete</span><span class="o">.</span><span class="na">setString</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span> <span class="s">"10001"</span><span class="o">);</span>
+            <span class="n">pstmtDelete</span><span class="o">.</span><span class="na">executeUpdate</span><span class="o">();</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="err">​</span>
+        <span class="o">}</span>
+        <span class="k">catch</span> <span class="o">(</span><span class="nc">SQLException</span> <span class="n">e</span><span class="o">)</span>
+        <span class="o">{</span>
+            <span class="o">--</span>  <span class="no">TODO</span> <span class="nc">Auto</span><span class="o">-</span><span class="n">generated</span> <span class="k">catch</span> <span class="n">block</span>
+            <span class="n">e</span><span class="o">.</span><span class="na">printStackTrace</span><span class="o">();</span>
+        <span class="o">}</span>
+<span class="err">​</span>
+    <span class="o">}</span>
+<span class="err">​</span>
+<span class="err">​</span>
+<span class="o">}</span>
+</code></pre></div></div>
+:ET

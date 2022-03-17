@@ -1,0 +1,216 @@
+<hr />
+<p>接上篇：<a href="/myblogs/服务端(多线程,-面向对象)">服务端(多线程, 面向对象)</a>。实现服务端收到消息后自动向客户端发送收到提示，且客户端并行接收来自服务端的消息和向服务端发送消息。
+运用面向对象编程方法和多线程编程，将客户端抽象为类，构造两个线程分别用于从服务端接收消息和向服务端发送消息。</p>
+
+<p>主程序中创建客户端对象，并用目标服务端IP和端口号初始化，客户端开始运行，连接服务端，创建两个线程实现发送和接收消息，且发送线程结束后接收线程立即结束。</p>
+
+<p>客户端类的属性应包含：服务端IP和端口号，客户端套接字描述符，用于向服务端发送消息的函数，从服务度接收消息的函数，启动客户端的函数。</p>
+
+<p>为确保发送消息的线程先于接收消息的线程结束，可以利用关闭服务端和客户端之间的连接后接收服务端消息的线程接收到的字符串的长度小于等于0，当服务端接收到客户端发送的退出提示时关闭客户端与服务端的连接，在接收服务端消息的线程中判断接收到的消息长度是否小于等于0，若成立则终止接收服务端消息的进程，且应让主线程阻塞等待发送消息的线程结束再让接收消息的线程结束；</p>
+
+<p>IP用string存储，端口号和套接字描述符用int；</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#ifndef CLIENT_H
+#define CLIENT_H
+</span>
+<span class="cp">#include</span> <span class="cpf">"global.h"</span><span class="cp">
+</span>
+<span class="k">class</span> <span class="nc">client</span><span class="p">{</span>
+    <span class="nl">private:</span>
+        <span class="kt">int</span> <span class="n">server_port</span><span class="p">;</span><span class="c1">//服务器端口</span>
+        <span class="n">string</span> <span class="n">server_ip</span><span class="p">;</span><span class="c1">//服务器ip</span>
+        <span class="kt">int</span> <span class="n">sock</span><span class="p">;</span><span class="c1">//与服务器建立连接的套接字描述符</span>
+    <span class="nl">public:</span>
+        <span class="n">client</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">);</span>
+        <span class="o">~</span><span class="n">client</span><span class="p">();</span>
+        <span class="kt">void</span> <span class="n">run</span><span class="p">();</span><span class="c1">//启动客户端服务</span>
+        <span class="k">static</span> <span class="kt">void</span> <span class="n">SendMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">);</span><span class="c1">//发送线程</span>
+        <span class="k">static</span> <span class="kt">void</span> <span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">);</span><span class="c1">//接收线程</span>
+<span class="p">};</span>
+<span class="cp">#endif
+</span></code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">"client.h"</span><span class="cp">
+</span>
+<span class="n">client</span><span class="o">::</span><span class="n">client</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">)</span><span class="o">:</span><span class="n">server_port</span><span class="p">(</span><span class="n">port</span><span class="p">),</span><span class="n">server_ip</span><span class="p">(</span><span class="n">ip</span><span class="p">){}</span>
+<span class="n">client</span><span class="o">::~</span><span class="n">client</span><span class="p">(){</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">sock</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>启动客户端的函数定义为普通的非静态成员函数即可：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 使用对象属性中的服务端IP和端口号创建网络地址；
+2. 创建一个套接字描述符；
+3. 申请建立到前述网络地址的连接；
+4. 使用发送消息的函数和接收消息的函数创建线程；
+5. 让主线程等待发送消息的线程结束在让其等待接收消息的线程结束；  
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="n">client</span><span class="o">::</span><span class="n">run</span><span class="p">(){</span>
+
+    <span class="c1">//定义sockfd</span>
+    <span class="n">sock</span> <span class="o">=</span> <span class="n">socket</span><span class="p">(</span><span class="n">AF_INET</span><span class="p">,</span><span class="n">SOCK_STREAM</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="c1">//定义sockaddr_in</span>
+    <span class="k">struct</span> <span class="nc">sockaddr_in</span> <span class="n">servaddr</span><span class="p">;</span>
+    <span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">servaddr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">servaddr</span><span class="p">));</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_family</span> <span class="o">=</span> <span class="n">AF_INET</span><span class="p">;</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_port</span> <span class="o">=</span> <span class="n">htons</span><span class="p">(</span><span class="n">server_port</span><span class="p">);</span>  <span class="c1">//服务器端口</span>
+    <span class="n">servaddr</span><span class="p">.</span><span class="n">sin_addr</span><span class="p">.</span><span class="n">s_addr</span> <span class="o">=</span> <span class="n">inet_addr</span><span class="p">(</span><span class="n">server_ip</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>  <span class="c1">//服务器ip</span>
+
+    <span class="c1">//连接服务器，成功返回0，错误返回-1</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">connect</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="p">(</span><span class="k">struct</span> <span class="nc">sockaddr</span> <span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">servaddr</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">servaddr</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">perror</span><span class="p">(</span><span class="s">"connect"</span><span class="p">);</span>
+        <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"连接服务器成功</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+
+    <span class="c1">//创建发送线程和接收线程</span>
+    <span class="kr">thread</span> <span class="n">send_t</span><span class="p">(</span><span class="n">SendMsg</span><span class="p">,</span><span class="n">sock</span><span class="p">),</span><span class="n">recv_t</span><span class="p">(</span><span class="n">RecvMsg</span><span class="p">,</span><span class="n">sock</span><span class="p">);</span>
+    <span class="n">send_t</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"发送线程已结束</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="n">recv_t</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+    <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"接收线程已结束</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+    <span class="k">return</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>向服务端发送消息的函数和从服务端接收消息的函数可以都定义为静态函数，若定义为非静态成员函数则创建线程时还要传入该客户端的实例对象，定义为静态函数则只要要传入客户端的套接字描述符；
+向服务端发送消息的函数：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 创建缓冲区；
+2. 创建循环：
+    a. 重置缓冲区；
+    b. 读取用户输入数据到缓冲区；
+    c. 发送缓冲区中数据；
+    d. 若发送失败或发送结束提示则结束循环；  
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//注意，前面不用加static！</span>
+<span class="kt">void</span> <span class="n">client</span><span class="o">::</span><span class="n">SendMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">){</span>
+    <span class="kt">char</span> <span class="n">sendbuf</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+    <span class="k">while</span> <span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">));</span>
+        <span class="n">cin</span><span class="o">&gt;&gt;</span><span class="n">sendbuf</span><span class="p">;</span>
+        <span class="kt">int</span> <span class="n">ret</span><span class="o">=</span><span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">sendbuf</span><span class="p">,</span> <span class="n">strlen</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span> <span class="c1">//发送</span>
+        <span class="c1">//输入exit或者对端关闭时结束</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">sendbuf</span><span class="p">,</span><span class="s">"exit"</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span><span class="o">||</span><span class="n">ret</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>从服务端接收消息的函数：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 创建缓冲区；
+2. 创建循环：
+    a. 重置缓冲区；
+    b. 接收服务端数据写入缓冲区；
+    c. 若接收字符串长度小于等于0则终止循环；  
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//注意，前面不用加static！</span>
+<span class="kt">void</span> <span class="n">client</span><span class="o">::</span><span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">){</span>
+    <span class="c1">//接收缓冲区</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+    <span class="c1">//不断接收数据</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">));</span>
+        <span class="kt">int</span> <span class="n">len</span> <span class="o">=</span> <span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="c1">//recv返回值小于等于0，退出</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">len</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"收到服务器发来的信息："</span><span class="o">&lt;&lt;</span><span class="n">buffer</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>服务端在收到客户端退出消息后立即关闭客户端套接字描述符，故当服务端即将销毁调用析构函数时就无需关闭前面已经关闭的套接字描述符了，所以需要确定哪些套接字描述符还处于打开状态；</p>
+
+<p>由于套接字描述符为int类型，故可以建立一个数组，它的每个元素的下标代表套接字描述符，其每个元素值代表该套接字描述符已关闭否，数组长度为系统允许打开的描述符个数（使用命令<code class="language-plaintext highlighter-rouge">ulimit -n</code>查看），该数组所有元素全初始化为false，表示尚未打开任何描述符。</p>
+
+<p>由于服务端类的接收消息的函数会在客户端发送消息进程结束后关闭与该客户端的连接，关闭后应置此数组中对应元素为false，而服务器类该接收消息的函数为静态函数，且静态函数不能直接访问非静态成员，故若将此数组定义为非静态成员则可能要将其作为参数传给前述静态函数以进一步操作，但是考虑到机器中的套接字描述符的状态对于任何服务端对象都是一致的，所以可以直接将其定义为静态成员变量以在静态函数中直接访问。</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#ifndef SERVER_H
+#define SERVER_H
+</span>
+<span class="cp">#include</span> <span class="cpf">"global.h"</span><span class="cp">
+</span>
+<span class="k">class</span> <span class="nc">server</span><span class="p">{</span>
+    <span class="nl">private:</span>
+        <span class="kt">int</span> <span class="n">server_port</span><span class="p">;</span>
+        <span class="kt">int</span> <span class="n">server_sockfd</span><span class="p">;</span>
+        <span class="n">string</span> <span class="n">server_ip</span><span class="p">;</span>
+        <span class="k">static</span> <span class="n">vector</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span> <span class="n">sock_arr</span><span class="p">;</span><span class="c1">//改为了静态成员变量，且类型变为vector&lt;bool&gt;</span>
+    <span class="nl">public:</span>
+        <span class="n">server</span><span class="p">(</span><span class="kt">int</span> <span class="n">port</span><span class="p">,</span><span class="n">string</span> <span class="n">ip</span><span class="p">);</span>
+        <span class="o">~</span><span class="n">server</span><span class="p">();</span>
+        <span class="kt">void</span> <span class="n">run</span><span class="p">();</span>
+        <span class="k">static</span> <span class="kt">void</span> <span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">);</span>
+<span class="p">};</span>
+<span class="cp">#endif
+</span></code></pre></div></div>
+<p>服务端接收消息的函数：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 创建缓冲区；
+2. 创建循环：
+    a. 重置缓冲区；
+    b. 根据客户端套接字描述符接收客户端发送的消息到缓冲区中；
+    c. 判断客户端发送的消息是否为"exit"或长度是否小于等于零，若是则关闭服务器套接字描述符，置相应数组元素为false，终止循环；
+    d. 向客户端发送收到提示；
+    e. 判断是否发送成功，若发送不成功则关闭客户端套接字且置相应数组元素为false，终止循环。     
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//注意，前面不用加static！</span>
+<span class="kt">void</span> <span class="n">server</span><span class="o">::</span><span class="n">RecvMsg</span><span class="p">(</span><span class="kt">int</span> <span class="n">conn</span><span class="p">){</span>
+    <span class="c1">//接收缓冲区</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+    <span class="c1">//不断接收数据</span>
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">memset</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">));</span>
+        <span class="kt">int</span> <span class="n">len</span> <span class="o">=</span> <span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="c1">//客户端发送exit或者异常结束时，退出</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="s">"exit"</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span> <span class="o">||</span> <span class="n">len</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">){</span>
+            <span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">);</span>
+            <span class="n">sock_arr</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span><span class="o">=</span><span class="nb">false</span><span class="p">;</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">cout</span><span class="o">&lt;&lt;</span><span class="s">"收到套接字描述符为"</span><span class="o">&lt;&lt;</span><span class="n">conn</span><span class="o">&lt;&lt;</span><span class="s">"发来的信息："</span><span class="o">&lt;&lt;</span><span class="n">buffer</span><span class="o">&lt;&lt;</span><span class="n">endl</span><span class="p">;</span>
+        <span class="c1">//回复客户端</span>
+        <span class="n">string</span> <span class="n">ans</span><span class="o">=</span><span class="s">"收到"</span><span class="p">;</span>
+        <span class="kt">int</span> <span class="n">ret</span> <span class="o">=</span> <span class="n">send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span><span class="n">ans</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span><span class="n">ans</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="mi">0</span><span class="p">);</span>
+        <span class="c1">//服务器收到exit或者异常关闭套接字描述符</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">ret</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">){</span>
+            <span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">);</span>
+            <span class="n">sock_arr</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span><span class="o">=</span><span class="nb">false</span><span class="p">;</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>服务端的析构函数：</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 遍历描述系统所有套接字描述符的数组，若某元素值为true则关闭其下标表示的套接字描述符；
+2. 关闭服务端套接字描述符。  
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">server</span><span class="o">::~</span><span class="n">server</span><span class="p">(){</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">i</span><span class="o">&lt;</span><span class="n">sock_arr</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="n">i</span><span class="o">++</span><span class="p">){</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">sock_arr</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">close</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">close</span><span class="p">(</span><span class="n">server_sockfd</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>客户端向服务端发送消息和从服务端接收消息使用的套接字描述符都是自己的套接字描述符，而服务端向客户端发送消息和从客户端接收消息用的都是客户端的套接字描述符，即无论客户端还是服务端，无论是发送消息还是接收消息使用的都是客户端的套接字。</p>
+
+<p>主函数：</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span><span class="cpf">"client.h"</span><span class="cp">
+</span><span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+    <span class="n">client</span> <span class="n">clnt</span><span class="p">(</span><span class="mi">8023</span><span class="p">,</span><span class="s">"127.0.0.1"</span><span class="p">);</span>
+    <span class="n">clnt</span><span class="p">.</span><span class="n">run</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>下一篇：<a href="/myblogs/注册用户(c++,-mysql)">注册用户(c++, mysql)</a></p>

@@ -1,0 +1,11 @@
+I"\<hr />
+
+<p>使用C++连接mysql，尝试在数据库表中插入数据。</p>
+
+<h3 id="启动mysql">启动mysql</h3>
+<p>在macOS上使用homebrew安装的mysql，使用<code class="language-plaintext highlighter-rouge">brew services start mysql </code>启动mysql：</p>
+<div align="left">
+    <img src="/images/mysql01.png" width="80%" />
+</div>
+
+:ET
